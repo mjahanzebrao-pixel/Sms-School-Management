@@ -183,6 +183,7 @@ a.btn{text-decoration:none;display:inline-block}
       <a class="btn" href="challans.html">Challans</a>
       <a class="btn" href="payments.html">Deposit</a>
       <a class="btn" href="reminders.html">Reminders</a>
+      <a class="btn" href="attendance.html">Attendance</a>
       <button class="btn" onclick="smsSignOut()">Sign out</button>
     </div>
   </div>
@@ -529,6 +530,15 @@ function maskCnic(el){
   if(d.length > 12) out += '-' + d.slice(12,13);
   el.value = out;
 }
+/* Store Pakistani mobiles as +923XXXXXXXXX so WhatsApp links always work */
+function normPk(raw){
+  let d=String(raw||'').replace(/\D/g,'');
+  if(d.startsWith('0092')) d=d.slice(4);
+  else if(d.startsWith('92') && d.length===12) d=d.slice(2);
+  else if(d.startsWith('0') && d.length===11) d=d.slice(1);
+  return (d.length===10 && d.startsWith('3')) ? '+92'+d : '';
+}
+
 /* Mobile: 0300-1234567 */
 function maskPhone(el){
   const d = el.value.replace(/\D/g,'').slice(0,11);
@@ -582,7 +592,7 @@ function renderStudents(){
       <td><div class="nm">${esc(s.name)}</div><div class="fa">s/o ${esc(s.father_name)}</div></td>
       <td class="hide-sm num">${esc(s.class_label)}</td>
       <td class="hide-sm num" style="color:var(--ink-3)">${esc(s.admission_no)}</td>
-      <td class="num" style="${s.guardian_phone?'':'color:var(--oxide)'}">${
+      <td class="num" style="${normPk(s.guardian_phone)?'':'color:var(--oxide)'}">${
         esc(s.guardian_phone||'missing')}</td>
       <td class="hide-sm num">${esc(s.roll_no||'—')}</td>
     </tr>`).join('') + '</tbody></table>';
@@ -606,7 +616,7 @@ async function saveStudent(){
     class_id: document.getElementById('stClass').value||null,
     section_id: document.getElementById('stSection').value||null,
     roll_no: document.getElementById('stRoll').value.trim()||null,
-    guardian_phone: document.getElementById('stPhone').value.trim()||null,
+    guardian_phone: normPk(document.getElementById('stPhone').value) || document.getElementById('stPhone').value.trim() || null,
     guardian_cnic: document.getElementById('stCnic').value.replace(/\D/g,'')||null,
     b_form: document.getElementById('stBform').value.replace(/\D/g,'')||null,
     gender: document.getElementById('stGender').value||null,

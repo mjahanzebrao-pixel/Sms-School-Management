@@ -118,7 +118,7 @@ td .fa{color:var(--ink-3);font-size:12.5px}
 .empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:5px;
   font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.09em}
 
-/* ---------- printable voucher ---------- */
+/* print styles live in the print window */
 #printArea{display:none}
 .sheet{background:#fff;color:#000;width:190mm;margin:0 auto}
 .copy{border:1px solid #000;padding:5mm 6mm;margin-bottom:3mm;position:relative}
@@ -275,6 +275,8 @@ td .fa{color:var(--ink-3);font-size:12.5px}
           <option value="partial">Part paid</option>
           <option value="paid">Paid</option>
         </select>
+        <input type="text" id="rSearch" oninput="renderRegister()" style="width:260px"
+               placeholder="Name, father, roll, adm, CNIC, CRC">
       </div>
     </div>
 
@@ -294,7 +296,6 @@ td .fa{color:var(--ink-3);font-size:12.5px}
   </section>
 </div>
 
-<div id="printArea"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -471,6 +472,21 @@ function renderRegister(){
   }
   if(st) list = list.filter(r=>r.status===st);
 
+  const q = (document.getElementById('rSearch').value||'').trim().toLowerCase();
+  if(q){
+    const qd = q.replace(/\D/g,'');
+    list = list.filter(r=>
+      (r.student_name||'').toLowerCase().includes(q) ||
+      (r.father_name||'').toLowerCase().includes(q) ||
+      (r.roll_no||'').toLowerCase().includes(q) ||
+      (r.admission_no||'').toLowerCase().includes(q) ||
+      (r.challan_no||'').toLowerCase().includes(q) ||
+      (qd.length>=4 && (r.guardian_cnic||'').includes(qd)) ||
+      (qd.length>=4 && (r.b_form||'').includes(qd)) ||
+      (qd.length>=4 && (r.guardian_phone||'').replace(/\D/g,'').includes(qd))
+    );
+  }
+
   const billed = list.reduce((s,r)=>s+Number(r.total||0),0);
   const paid   = list.reduce((s,r)=>s+Number(r.paid_amount||0),0);
   document.getElementById('regStats').innerHTML = `
@@ -509,65 +525,126 @@ function pickAllRows(on){
 }
 
 /* ---------------- printing ---------------- */
-const COPIES = [['School Copy','اسکول کاپی'],['Bank Copy','بینک کاپی'],['Parent Copy','والدین کاپی']];
+const COPIES = [
+  ['Student Copy','والدین کاپی','1 of 2'],
+  ['School Copy','اسکول کاپی','2 of 2']
+];
 
 function bars(seed){
   let out='';
-  for(let i=0;i<42;i++){
+  for(let i=0;i<46;i++){
     const w = (seed.charCodeAt(i % seed.length) % 3) + 1;
-    out += `<i style="width:${w*0.4}mm;height:${w===3?9:7.5}mm"></i>`;
+    out += `<i style="width:${w*0.42}mm;height:${w===3?8:6.5}mm"></i>`;
   }
   return out;
 }
 
-function copyHtml(r, tag, tagUr){
-  const snap = r.snapshot||{};
+function copyHtml(r, tag, tagUr, seq){
+  const snap  = r.snapshot||{};
   const lines = (snap.lines||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  const settings = r.school_settings||{};
+  const surcharge = Number(settings.late_surcharge||0);
+  const perDay    = Number(settings.fine_per_day_display||0);
+
   let n = 0;
-  const rows = lines.map(l=>`<tr><td style="width:8mm" class="amt">${++n}</td>
+  let rows = lines.map(l=>`<tr><td class="sn">${++n}</td>
       <td>${esc(l.description)}</td><td class="amt">${rs(l.amount)}</td></tr>`).join('');
 
-  const extra = [];
-  if(Number(r.arrears)>0) extra.push(`<tr class="arr"><td class="amt">${++n}</td>
-      <td>Arrears carried forward</td><td class="amt">${rs(r.arrears)}</td></tr>`);
-  if(Number(r.discount)>0) extra.push(`<tr><td class="amt">${++n}</td>
-      <td>Concession</td><td class="amt">−${rs(r.discount)}</td></tr>`);
-  if(Number(r.fine_now)>0) extra.push(`<tr><td class="amt">${++n}</td>
-      <td>Late fine to date</td><td class="amt">${rs(r.fine_now)}</td></tr>`);
+  if(Number(r.arrears)>0) rows += `<tr class="arr"><td class="sn">${++n}</td>
+      <td>Arrears carried forward</td><td class="amt">${rs(r.arrears)}</td></tr>`;
+  if(Number(r.discount)>0) rows += `<tr class="disc"><td class="sn">${++n}</td>
+      <td>Concession</td><td class="amt">&minus;${rs(r.discount)}</td></tr>`;
 
-  const payable = Number(r.total) + Number(r.fine_now||0);
+  const payable = Number(r.total);
+  const initials = (r.school_name||'').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+
+  const dueBox = surcharge > 0
+    ? `<div class="amtbox late">
+         <span>After due date</span>
+         <b>Rs ${rs(payable + surcharge)}</b>
+       </div>`
+    : '';
 
   return `<div class="copy">
+    <div class="ctag">${tag} <em>${seq}</em></div>
+
     <div class="chead">
-      <div>
+      <div class="crest">${initials}</div>
+      <div class="cid">
         <div class="sname">${esc(r.school_name)}</div>
-        <div class="saddr">${esc(r.school_address||'')}${r.school_phone?' · '+esc(r.school_phone):''}</div>
+        <div class="saddr">${esc(r.school_address||'')}${r.school_phone?' &middot; '+esc(r.school_phone):''}</div>
       </div>
-      <div class="ctag">${tag}</div>
+      <div class="cno">
+        <span>Challan No</span>
+        <b>${esc(r.challan_no)}</b>
+      </div>
     </div>
+
     <div class="meta">
-      <div><b>Challan No</b>${esc(r.challan_no)}</div>
-      <div><b>Student</b>${esc(r.student_name)}</div>
-      <div><b>Father</b>${esc(r.father_name)}</div>
-      <div><b>Class / Roll</b>${esc(r.class_name||'—')}${r.section_name?'-'+esc(r.section_name):''} / ${esc(r.roll_no||'—')}</div>
-      <div><b>Admission No</b>${esc(r.admission_no)}</div>
-      <div><b>Month</b>${MONTHS[r.bill_month-1]} ${r.bill_year}</div>
-      <div><b>Issued</b>${esc(r.issue_date)}</div>
-      <div><b>Due Date</b>${esc(r.due_date)}</div>
+      <div><span>Student</span><b>${esc(r.student_name)}</b></div>
+      <div><span>Father</span><b>${esc(r.father_name)}</b></div>
+      <div><span>Class / Roll</span><b>${esc(r.class_name||'—')}${r.section_name?'-'+esc(r.section_name):''} / ${esc(r.roll_no||'—')}</b></div>
+      <div><span>Admission No</span><b>${esc(r.admission_no)}</b></div>
+      <div><span>Fee Month</span><b>${MONTHS[r.bill_month-1]} ${r.bill_year}</b></div>
+      <div><span>Issue Date</span><b>${fmtd(r.issue_date)}</b></div>
+      <div><span>Due Date</span><b class="due">${fmtd(r.due_date)}</b></div>
+      <div><span>Status</span><b>${r.status==='paid'?'PAID':'Unpaid'}</b></div>
     </div>
-    <table><tbody>
-      ${rows}${extra.join('')}
-      <tr class="tot"><td></td><td>Total Payable</td><td class="amt">Rs ${rs(payable)}</td></tr>
-    </tbody></table>
-    <div class="cfoot">
-      <div>
-        <div class="bars">${bars(r.challan_no)}</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:6.5pt;letter-spacing:.12em;margin-top:.6mm">
-          ${esc(r.challan_no.replace(/-/g,' '))}</div>
+
+    <table class="items">
+      <thead><tr><th class="sn">#</th><th>Particulars</th><th class="amt">Amount (Rs)</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <div class="amtrow">
+      <div class="amtbox pay">
+        <span>Payable by due date</span>
+        <b>Rs ${rs(payable)}</b>
       </div>
-      <div class="sig">Accountant / Bank Stamp</div>
+      ${dueBox}
+    </div>
+
+    <div class="words">${esc(numWords(payable))}</div>
+    ${perDay>0?`<div class="urdu">مقررہ تاریخ کے بعد ${perDay} روپے یومیہ جرمانہ عائد ہوگا۔</div>`:''}
+
+    <div class="cfoot">
+      <div class="bcwrap">
+        <div class="bars">${bars(r.challan_no)}</div>
+        <div class="bcno">${esc(r.challan_no.replace(/-/g,' '))}</div>
+      </div>
+      <div class="sigs">
+        <div class="sig">Depositor</div>
+        <div class="sig">Accountant / Stamp</div>
+      </div>
     </div>
   </div>`;
+}
+
+function fmtd(d){
+  if(!d) return '—';
+  const [y,m,dd] = String(d).split('-');
+  return `${dd}-${m}-${y}`;
+}
+
+const W1 = ['','one','two','three','four','five','six','seven','eight','nine','ten','eleven',
+  'twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+const W2 = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+function under100(n){
+  if(n < 20) return W1[n];
+  return W2[Math.floor(n/10)] + (n%10 ? '-'+W1[n%10] : '');
+}
+function numWords(v){
+  let n = Math.floor(Number(v)||0);
+  if(n === 0) return 'Rupees zero only';
+  let out = '';
+  const units = [[10000000,'crore'],[100000,'lakh'],[1000,'thousand'],[100,'hundred']];
+  for(const [div,name] of units){
+    const part = Math.floor(n/div);
+    if(part > 0){ out += under100(part) + ' ' + name + ' '; n %= div; }
+  }
+  if(n > 0) out += under100(n) + ' ';
+  out = out.trim();
+  return 'Rupees ' + out.charAt(0).toUpperCase() + out.slice(1) + ' only';
 }
 
 function printSelected(){
@@ -575,9 +652,107 @@ function printSelected(){
   if(!ids.length) return toast('Select at least one challan');
   const rows = register.filter(r=>ids.includes(r.id));
 
-  document.getElementById('printArea').innerHTML = rows.map(r=>
-    `<div class="sheet">${COPIES.map(([t,u])=>copyHtml(r,t,u)).join('')}</div>`).join('');
-  window.print();
+  const body = rows.map(r=>
+    `<div class="sheet">
+       ${copyHtml(r, COPIES[0][0], COPIES[0][1], COPIES[0][2])}
+       <div class="perf"><span>cut here</span></div>
+       ${copyHtml(r, COPIES[1][0], COPIES[1][1], COPIES[1][2])}
+     </div>`).join('');
+
+  const win = window.open('', '_blank');
+  if(!win) return toast('Allow pop-ups for this site, then print again');
+
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Challans — ${rows.length} student${rows.length===1?'':'s'}</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Nastaliq+Urdu:wght@400&display=swap" rel="stylesheet">
+<style>
+@page{size:A4 portrait;margin:9mm}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#14232E;
+  font-family:'IBM Plex Sans',sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+.sheet{width:192mm;margin:0 auto;page-break-after:always}
+.sheet:last-child{page-break-after:auto}
+
+.copy{position:relative;border:0.5mm solid #14232E;padding:6mm 7mm 5mm;
+  height:130mm;display:flex;flex-direction:column;page-break-inside:avoid}
+
+.ctag{position:absolute;top:0;right:0;background:#14232E;color:#fff;
+  font-family:'Barlow Condensed',sans-serif;font-size:9pt;font-weight:600;
+  text-transform:uppercase;letter-spacing:.18em;padding:1.5mm 5mm}
+.ctag em{font-style:normal;opacity:.6;letter-spacing:.1em;margin-left:2mm}
+
+.chead{display:flex;align-items:center;gap:4mm;border-bottom:0.5mm solid #14232E;
+  padding-bottom:3mm;margin-bottom:3mm}
+.crest{width:13mm;height:13mm;flex:none;border:0.4mm solid #14232E;display:flex;
+  align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;
+  font-size:15pt;font-weight:700;letter-spacing:.02em}
+.cid{flex:1}
+.sname{font-family:'Barlow Condensed',sans-serif;font-size:19pt;font-weight:700;
+  text-transform:uppercase;letter-spacing:.03em;line-height:1.05}
+.saddr{font-size:8pt;color:#5A6B76;margin-top:.6mm}
+.cno{text-align:right;flex:none;padding-right:22mm}
+.cno span{display:block;font-family:'Barlow Condensed',sans-serif;font-size:7pt;
+  text-transform:uppercase;letter-spacing:.14em;color:#7C8F9B}
+.cno b{font-family:'IBM Plex Mono',monospace;font-size:11pt;font-weight:600;letter-spacing:.02em}
+
+.meta{display:grid;grid-template-columns:repeat(4,1fr);gap:2.5mm 5mm;margin-bottom:3.5mm}
+.meta span{display:block;font-family:'Barlow Condensed',sans-serif;font-size:7pt;
+  text-transform:uppercase;letter-spacing:.13em;color:#7C8F9B;line-height:1.2}
+.meta b{font-size:9.5pt;font-weight:600;line-height:1.25}
+.meta b.due{color:#A8332A}
+
+.items{width:100%;border-collapse:collapse;font-size:9.5pt}
+.items thead th{font-family:'Barlow Condensed',sans-serif;font-size:7.5pt;font-weight:600;
+  text-transform:uppercase;letter-spacing:.13em;color:#7C8F9B;text-align:left;
+  border-bottom:0.4mm solid #14232E;padding:0 0 1.2mm}
+.items th.amt,.items td.amt{text-align:right}
+.items th.sn,.items td.sn{width:8mm;text-align:left;color:#7C8F9B}
+.items td{padding:1.7mm 0;border-bottom:0.15mm dotted #B4C0C8}
+.items td.amt{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.items tr.arr td{background:#F6EAE7;font-weight:600}
+.items tr.arr td.sn{padding-left:1.5mm}
+.items tr.arr td.amt{padding-right:1.5mm;color:#A8332A}
+.items tr.disc td.amt{color:#2E6B4F}
+
+.amtrow{display:flex;gap:3mm;margin-top:auto;padding-top:3.5mm}
+.amtbox{flex:1;border:0.5mm solid #14232E;padding:2mm 4mm;display:flex;
+  align-items:baseline;justify-content:space-between;gap:3mm}
+.amtbox span{font-family:'Barlow Condensed',sans-serif;font-size:8pt;font-weight:600;
+  text-transform:uppercase;letter-spacing:.13em;color:#5A6B76}
+.amtbox b{font-family:'IBM Plex Mono',monospace;font-size:15pt;font-weight:600;white-space:nowrap}
+.amtbox.pay{background:#EEF2EC}
+.amtbox.late{border-color:#A8332A;background:#FAEEEC}
+.amtbox.late span,.amtbox.late b{color:#A8332A}
+
+.words{font-size:8pt;color:#3D5261;margin-top:2mm;font-style:italic}
+.urdu{font-family:'Noto Nastaliq Urdu',serif;font-size:8pt;color:#A8332A;
+  direction:rtl;text-align:right;line-height:2;margin-top:.5mm}
+
+.cfoot{display:flex;justify-content:space-between;align-items:flex-end;
+  margin-top:3mm;padding-top:2.5mm;border-top:0.15mm solid #CBD8C8}
+.bars{display:flex;align-items:flex-end;gap:.35mm;height:8mm}
+.bars i{display:block;background:#14232E}
+.bcno{font-family:'IBM Plex Mono',monospace;font-size:7pt;letter-spacing:.18em;
+  color:#7C8F9B;margin-top:.8mm}
+.sigs{display:flex;gap:7mm}
+.sig{border-top:0.3mm solid #14232E;width:38mm;text-align:center;padding-top:1.2mm;
+  font-family:'Barlow Condensed',sans-serif;font-size:7.5pt;text-transform:uppercase;
+  letter-spacing:.12em;color:#5A6B76}
+
+.perf{position:relative;height:7mm;border-top:0.3mm dashed #7C8F9B;margin:3.5mm 0}
+.perf span{position:absolute;top:-2.4mm;left:50%;transform:translateX(-50%);
+  background:#fff;padding:0 3mm;font-family:'Barlow Condensed',sans-serif;
+  font-size:7pt;text-transform:uppercase;letter-spacing:.2em;color:#7C8F9B}
+
+@media screen{
+  body{background:#E7EDE5;padding:8mm 0}
+  .sheet{background:#fff;padding:9mm;margin-bottom:8mm;box-shadow:0 2px 10px rgba(20,35,46,.18)}
+}
+</style></head><body>${body}</body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>win.print(), 800);
 }
 
 function go(i,btn){

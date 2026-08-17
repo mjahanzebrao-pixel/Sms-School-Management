@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Students — School Management System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --ink:#14232E; --ink-2:#3D5261; --ink-3:#7C8F9B;
+  --paper:#FBFAF6; --ledger:#E7EDE5; --ledger-line:#CBD8C8; --rule:#D3D8D2;
+  --oxide:#A8332A; --oxide-soft:#F3E2E0;
+  --seal:#2E6B4F; --seal-soft:#E1EDE5;
+  --amber:#9A6B12; --amber-soft:#F6EBD5;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased}
+.num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.lbl{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
+  letter-spacing:.14em;font-weight:600;font-size:12px;color:var(--ink-3)}
+.ur{font-family:'Noto Nastaliq Urdu',serif;line-height:2.1}
+.wrap{max-width:1120px;margin:0 auto;padding:0 18px 90px}
+
+.topbar{border-bottom:2px solid var(--ink);padding:16px 0 12px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.crest{width:38px;height:38px;flex:none;border:1.5px solid var(--ink);display:grid;
+  place-items:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px}
+.brand h1{font-family:'Barlow Condensed',sans-serif;font-size:23px;font-weight:600;
+  letter-spacing:.03em;margin:0;text-transform:uppercase}
+.brand .sub{font-size:12px;color:var(--ink-3);margin-top:-2px}
+
+.tabs{display:flex;border-bottom:1px solid var(--rule);overflow-x:auto}
+.tab{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.13em;
+  font-size:13px;font-weight:600;color:var(--ink-3);background:none;border:0;
+  border-bottom:3px solid transparent;padding:13px 18px 10px;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);border-bottom-color:var(--oxide)}
+.view{display:none;padding-top:26px}
+.view.on{display:block}
+
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+  flex-wrap:wrap;margin-bottom:18px}
+.head h2{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:600;
+  letter-spacing:.02em;margin:0;text-transform:uppercase}
+
+button,select,input,textarea{font-family:inherit;font-size:14px}
+.btn{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.12em;
+  font-size:12.5px;font-weight:600;border:1px solid var(--rule);background:#fff;
+  color:var(--ink-2);padding:9px 14px;cursor:pointer}
+.btn:hover{border-color:var(--ink);color:var(--ink)}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.primary:hover{background:#0B1A24}
+.btn.danger{color:var(--oxide);border-color:var(--oxide-soft)}
+.btn.danger:hover{background:var(--oxide);color:#fff;border-color:var(--oxide)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.field{display:block;margin-bottom:12px}
+.field .lbl{display:block;margin-bottom:5px}
+input[type=text],input[type=date],input[type=number],select,textarea{
+  width:100%;padding:9px 11px;border:1px solid var(--rule);background:#fff;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--oxide);outline-offset:-1px;border-color:var(--oxide)}
+
+.panel{border:1px solid var(--rule);background:#fff}
+.panelhead{padding:11px 14px;border-bottom:1px solid var(--rule);
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse}
+thead th{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.13em;
+  font-size:11.5px;font-weight:600;color:var(--ink-3);text-align:left;padding:11px 12px;
+  border-bottom:1.5px solid var(--ink);white-space:nowrap}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--ledger-line);font-size:14px;vertical-align:middle}
+tbody tr:nth-child(even){background:var(--ledger)}
+td.r{text-align:right;font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+td .nm{font-weight:600}
+td .fa{color:var(--ink-3);font-size:12.5px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.classcard{border:1px solid var(--rule);background:#fff;padding:13px 14px;margin-bottom:-1px}
+.classcard .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.classcard .nm{font-weight:600}
+.secs{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.sec{font-family:'IBM Plex Mono',monospace;font-size:12px;border:1px solid var(--ledger-line);
+  background:var(--ledger);padding:3px 9px}
+.sec.add{border-style:dashed;background:#fff;cursor:pointer;color:var(--ink-3)}
+.sec.add:hover{color:var(--ink);border-color:var(--ink)}
+
+/* import wizard */
+.steps{display:flex;gap:0;margin-bottom:22px;border:1px solid var(--rule);background:#fff}
+.step{flex:1;padding:11px 13px;border-right:1px solid var(--rule);opacity:.42}
+.step:last-child{border-right:0}
+.step.on{opacity:1;background:var(--ledger)}
+.step.done{opacity:.85}
+.step .n{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--oxide);font-weight:600}
+.step .t{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
+  letter-spacing:.11em;font-weight:600;font-size:13px;margin-top:1px}
+
+.drop{border:2px dashed var(--ledger-line);background:#fff;padding:44px 20px;text-align:center}
+.drop.over{border-color:var(--seal);background:var(--seal-soft)}
+.drop h3{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
+  letter-spacing:.1em;font-size:18px;margin:0 0 6px}
+.drop p{color:var(--ink-3);font-size:13.5px;margin:0 0 16px}
+
+.maprow{display:grid;grid-template-columns:1fr 26px 1fr;gap:10px;align-items:center;
+  padding:9px 0;border-bottom:1px dashed var(--rule)}
+.maprow .src{font-family:'IBM Plex Mono',monospace;font-size:13px}
+.maprow .src small{display:block;color:var(--ink-3);font-size:11.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.arrow{text-align:center;color:var(--ink-3)}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);
+  border:1px solid var(--rule);margin-bottom:20px}
+.stat{background:#fff;padding:14px}
+.stat .v{font-family:'IBM Plex Mono',monospace;font-size:24px;font-weight:600;margin-top:4px}
+.stat.ok .v{color:var(--seal)}
+.stat.bad .v{color:var(--oxide)}
+.stat.warn .v{color:var(--amber)}
+
+.err{padding:9px 12px;border-bottom:1px dashed var(--rule);display:flex;gap:12px;font-size:13.5px}
+.err .rw{font-family:'IBM Plex Mono',monospace;color:var(--ink-3);flex:none;width:52px}
+.err .fl{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.1em;
+  font-size:11px;font-weight:600;flex:none;width:120px;color:var(--oxide)}
+.err.warn .fl{color:var(--amber)}
+
+.banner{border:1px solid var(--amber);background:var(--amber-soft);color:#5C420B;
+  padding:11px 14px;font-size:13.5px;margin:18px 0}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);
+  color:var(--paper);padding:12px 20px;font-size:14px;z-index:99;display:none}
+
+dialog{border:1px solid var(--ink);padding:0;background:#fff;width:min(560px,94vw)}
+dialog::backdrop{background:rgba(20,35,46,.55)}
+.dlghead{padding:13px 16px;border-bottom:1.5px solid var(--ink);
+  display:flex;justify-content:space-between;align-items:center}
+.dlghead h3{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
+  letter-spacing:.08em;font-size:18px;margin:0}
+.dlgbody{padding:16px;max-height:66vh;overflow:auto}
+.dlgfoot{padding:13px 16px;border-top:1px solid var(--rule);display:flex;
+  justify-content:flex-end;gap:9px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+
+.empty{padding:44px 20px;text-align:center;color:var(--ink-3);font-size:14px}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:5px;
+  font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.09em}
+
+@media(max-width:820px){
+  .grid2{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+  .two{grid-template-columns:1fr}
+  .hide-sm{display:none}
+  .maprow{grid-template-columns:1fr;gap:5px}
+  .arrow{display:none}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+:focus-visible{outline:2px solid var(--oxide);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="crest" id="crest">··</div>
+      <div>
+        <h1 id="schoolName">Loading…</h1>
+        <div class="sub" id="schoolSub">Connecting</div>
+      </div>
+    </div>
+    <div><button class="btn" onclick="location.reload()">Refresh</button></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" onclick="go(0,this)">Classes &amp; Sections</button>
+    <button class="tab" onclick="go(1,this)">Students</button>
+    <button class="tab" onclick="go(2,this)">Import</button>
+  </div>
+
+  <div id="cfgWarn" class="banner" style="display:none">
+    Set <b>SUPABASE_URL</b> and <b>SUPABASE_ANON_KEY</b> at the top of this file's script block, then reload.
+  </div>
+
+  <!-- ============ CLASSES ============ -->
+  <section class="view on">
+    <div class="head">
+      <h2>Classes &amp; Sections</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="seedClasses()">Load standard classes</button>
+        <button class="btn primary" onclick="openClass()">Add class</button>
+      </div>
+    </div>
+    <div id="classList"></div>
+  </section>
+
+  <!-- ============ STUDENTS ============ -->
+  <section class="view">
+    <div class="head">
+      <h2>Students</h2>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="fClass" onchange="renderStudents()" style="width:auto"><option value="">All classes</option></select>
+        <input type="text" id="fSearch" placeholder="Name, father or adm. no" oninput="renderStudents()" style="width:230px">
+        <button class="btn primary" onclick="openStudent()">Add student</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panelhead">
+        <div class="lbl" id="rosterCount">—</div>
+        <div class="lbl">Active only</div>
+      </div>
+      <div id="rosterWrap"></div>
+    </div>
+  </section>
+
+  <!-- ============ IMPORT ============ -->
+  <section class="view">
+    <div class="head"><h2>Import Students</h2>
+      <div class="lbl">Excel or CSV &middot; nothing is saved until you confirm</div></div>
+
+    <div class="steps">
+      <div class="step on" id="s1"><div class="n">01</div><div class="t">Choose file</div></div>
+      <div class="step" id="s2"><div class="n">02</div><div class="t">Match columns</div></div>
+      <div class="step" id="s3"><div class="n">03</div><div class="t">Check errors</div></div>
+      <div class="step" id="s4"><div class="n">04</div><div class="t">Save</div></div>
+    </div>
+
+    <!-- step 1 -->
+    <div id="i1">
+      <div class="drop" id="drop">
+        <h3>Drop the school's student file here</h3>
+        <p>.xlsx, .xls or .csv — the header row can be anywhere in the first ten rows</p>
+        <button class="btn primary" onclick="document.getElementById('file').click()">Choose file</button>
+        <input type="file" id="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="readFile(this.files[0])">
+      </div>
+      <div class="banner">
+        Bring the file exactly as the school keeps it. Blank rows, merged title rows and
+        stray totals at the bottom are handled — don't ask the school to clean it up first.
+      </div>
+    </div>
+
+    <!-- step 2 -->
+    <div id="i2" style="display:none">
+      <div class="panel">
+        <div class="panelhead">
+          <div class="lbl" id="fileInfo">—</div>
+          <button class="btn" onclick="backTo(1)">Change file</button>
+        </div>
+        <div style="padding:14px">
+          <div class="lbl" style="margin-bottom:9px">Your column &rarr; system field</div>
+          <div id="mapRows"></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:16px">
+        <button class="btn primary" onclick="validate()">Check for errors</button>
+      </div>
+    </div>
+
+    <!-- step 3 -->
+    <div id="i3" style="display:none">
+      <div class="stats" id="dryStats"></div>
+      <div class="panel">
+        <div class="panelhead"><div class="lbl">Problems found</div>
+          <div class="lbl" id="errCount">—</div></div>
+        <div id="errList" style="max-height:380px;overflow:auto"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:9px;margin-top:16px;flex-wrap:wrap">
+        <button class="btn" onclick="backTo(2)">Back to columns</button>
+        <button class="btn primary" id="commitBtn" onclick="commit()">Save students</button>
+      </div>
+    </div>
+
+    <!-- step 4 -->
+    <div id="i4" style="display:none">
+      <div class="stats" id="finalStats"></div>
+      <div class="panel"><div class="empty">
+        <b>Import finished</b>
+        Open the Students tab to check the roster.
+      </div></div>
+      <div style="margin-top:16px"><button class="btn" onclick="backTo(1)">Import another file</button></div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ DIALOGS ============ -->
+<dialog id="dlgClass">
+  <div class="dlghead"><h3>Add class</h3>
+    <button class="btn" onclick="dlgClass.close()">Close</button></div>
+  <div class="dlgbody">
+    <label class="field"><span class="lbl">Class name</span>
+      <input type="text" id="cName" placeholder="Class 6"></label>
+    <label class="field"><span class="lbl">Urdu name (optional)</span>
+      <input type="text" id="cNameUr" class="ur" placeholder="جماعت ششم" dir="rtl"></label>
+    <label class="field"><span class="lbl">Sort order</span>
+      <input type="number" id="cOrder" value="1"></label>
+  </div>
+  <div class="dlgfoot">
+    <button class="btn" onclick="dlgClass.close()">Cancel</button>
+    <button class="btn primary" onclick="saveClass()">Save class</button>
+  </div>
+</dialog>
+
+<dialog id="dlgStudent">
+  <div class="dlghead"><h3 id="stTitle">Add student</h3>
+    <button class="btn" onclick="dlgStudent.close()">Close</button></div>
+  <div class="dlgbody">
+    <div class="two">
+      <label class="field"><span class="lbl">Student name</span><input type="text" id="stName"></label>
+      <label class="field"><span class="lbl">Father name</span><input type="text" id="stFather"></label>
+      <label class="field"><span class="lbl">Class</span><select id="stClass" onchange="fillSections()"></select></label>
+      <label class="field"><span class="lbl">Section</span><select id="stSection"></select></label>
+      <label class="field"><span class="lbl">Admission no</span>
+        <input type="text" id="stAdm" placeholder="leave blank to auto-generate"></label>
+      <label class="field"><span class="lbl">Roll no</span><input type="text" id="stRoll"></label>
+      <label class="field"><span class="lbl">Guardian WhatsApp</span>
+        <input type="text" id="stPhone" placeholder="0300 1234567"></label>
+      <label class="field"><span class="lbl">Guardian CNIC</span>
+        <input type="text" id="stCnic" placeholder="13 digits"></label>
+      <label class="field"><span class="lbl">Gender</span>
+        <select id="stGender"><option value="">—</option><option value="male">Male</option>
+        <option value="female">Female</option></select></label>
+      <label class="field"><span class="lbl">Date of birth</span><input type="date" id="stDob"></label>
+    </div>
+    <label class="field"><span class="lbl">Address</span><textarea id="stAddr" rows="2"></textarea></label>
+  </div>
+  <div class="dlgfoot">
+    <button class="btn" onclick="dlgStudent.close()">Cancel</button>
+    <button class="btn primary" onclick="saveStudent()">Save student</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================================================================
+   Keys live in config.js — nothing to edit here.
+   =================================================================== */
+const configured = !!(window.SMS_CONFIG && !!SMS_CONFIG.url.startsWith('https://'));
+const sb = configured ? supabase.createClient(SMS_CONFIG.url, SMS_CONFIG.anonKey) : null;
+
+let school = null, classes = [], sections = [], students = [];
+let raw = [], headers = [], mapping = {}, dry = null, fileName = '';
+
+const FIELDS = [
+  ['name',           'Student name',      true],
+  ['father_name',    'Father name',       true],
+  ['class',          'Class',             false],
+  ['section',        'Section',           false],
+  ['admission_no',   'Admission no',      false],
+  ['roll_no',        'Roll no',           false],
+  ['guardian_name',  'Guardian name',     false],
+  ['guardian_phone', 'Guardian WhatsApp', false],
+  ['cnic',           'Guardian CNIC',     false],
+  ['b_form',         'B-Form',            false],
+  ['gender',         'Gender',            false],
+  ['dob',            'Date of birth',     false],
+  ['address',        'Address',           false],
+  ['admission_date', 'Admission date',    false],
+];
+
+// header guesses — covers what PK school files actually use
+const GUESS = {
+  name:['name','student','student name','naam','نام','s/name','studentname'],
+  father_name:['father','father name','f/name','fname','father\'s name','walid','ولد'],
+  class:['class','grade','jamat','جماعت','standard'],
+  section:['section','sec','sect'],
+  admission_no:['adm','adm no','admission','admission no','admission number','reg','reg no','gr no','g.r no'],
+  roll_no:['roll','roll no','roll number','r/no'],
+  guardian_name:['guardian','guardian name','parent','parent name'],
+  guardian_phone:['phone','mobile','contact','cell','whatsapp','contact no','mobile no','number'],
+  cnic:['cnic','nic','id card','cnic no'],
+  b_form:['b form','b-form','bform','child cnic','form b'],
+  gender:['gender','sex','m/f'],
+  dob:['dob','date of birth','birth date','birthday'],
+  address:['address','addr','residence','pata'],
+  admission_date:['admission date','date of admission','doa','joining date'],
+};
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';
+  clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2600)}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+/* ---------------- boot ---------------- */
+async function boot(){
+  if(!configured){
+    document.getElementById('cfgWarn').style.display='block';
+    document.getElementById('schoolName').textContent='Not connected';
+    document.getElementById('schoolSub').textContent='Add your Supabase keys to continue';
+    return;
+  }
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ location.href = 'login.html'; return; }
+  const {data:s} = await sb.from('schools').select('*').limit(1).single();
+  school = s;
+  if(school){
+    document.getElementById('schoolName').textContent = school.name;
+    document.getElementById('schoolSub').textContent =
+      `${school.address||''} · Session ${school.academic_year}`;
+    document.getElementById('crest').textContent =
+      school.name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+  }
+  await loadClasses();
+  await loadStudents();
+}
+
+async function loadClasses(){
+  const {data:c} = await sb.from('classes').select('*').order('level_order');
+  const {data:sec} = await sb.from('sections').select('*').order('name');
+  classes = c||[]; sections = sec||[];
+  renderClasses(); fillClassPickers();
+}
+
+function renderClasses(){
+  const box = document.getElementById('classList');
+  if(!classes.length){
+    box.innerHTML = `<div class="panel"><div class="empty"><b>No classes yet</b>
+      Load the standard set and edit it, or add classes one by one.</div></div>`;
+    return;
+  }
+  box.innerHTML = classes.map(c=>{
+    const mine = sections.filter(s=>s.class_id===c.id);
+    const count = students.filter(s=>s.class_id===c.id).length;
+    return `<div class="classcard">
+      <div class="top">
+        <div>
+          <div class="nm">${esc(c.name)}
+            ${c.name_urdu?`<span class="ur" style="color:var(--ink-3);font-size:13px;margin-right:8px">${esc(c.name_urdu)}</span>`:''}
+          </div>
+          <div class="lbl" style="margin-top:2px">${count} student${count===1?'':'s'}</div>
+        </div>
+        <button class="btn danger" onclick="delClass('${c.id}')">Remove</button>
+      </div>
+      <div class="secs">
+        ${mine.map(s=>`<span class="sec">${esc(s.name)}</span>`).join('')}
+        <span class="sec add" onclick="addSection('${c.id}')">+ section</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function fillClassPickers(){
+  const f = document.getElementById('fClass');
+  f.innerHTML = '<option value="">All classes</option>' +
+    classes.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  const st = document.getElementById('stClass');
+  st.innerHTML = '<option value="">—</option>' +
+    classes.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+}
+function fillSections(){
+  const cid = document.getElementById('stClass').value;
+  document.getElementById('stSection').innerHTML = '<option value="">—</option>' +
+    sections.filter(s=>s.class_id===cid).map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
+}
+
+async function seedClasses(){
+  if(!school) return toast('Not connected');
+  const {error} = await sb.rpc('seed_default_classes',{p_school_id:school.id});
+  if(error) return toast(error.message);
+  await loadClasses(); toast('Standard classes loaded');
+}
+function openClass(){ dlgClass.showModal(); }
+async function saveClass(){
+  const name = document.getElementById('cName').value.trim();
+  if(!name) return toast('Class name is required');
+  const {data,error} = await sb.from('classes').insert({
+    school_id: school.id, name,
+    name_urdu: document.getElementById('cNameUr').value.trim()||null,
+    level_order: +document.getElementById('cOrder').value||0
+  }).select().single();
+  if(error) return toast(error.message);
+  await sb.from('sections').insert({school_id:school.id, class_id:data.id, name:'A'});
+  dlgClass.close(); document.getElementById('cName').value='';
+  await loadClasses(); toast('Class added');
+}
+async function addSection(cid){
+  const name = prompt('Section name (A, B, Blue…)');
+  if(!name) return;
+  const {error} = await sb.from('sections').insert({
+    school_id:school.id, class_id:cid, name:name.trim().toUpperCase()});
+  if(error) return toast(error.message);
+  await loadClasses();
+}
+async function delClass(id){
+  const n = students.filter(s=>s.class_id===id).length;
+  if(n) return toast(`Move the ${n} students out of this class first`);
+  if(!confirm('Remove this class and its sections?')) return;
+  const {error} = await sb.from('classes').delete().eq('id',id);
+  if(error) return toast(error.message);
+  await loadClasses(); toast('Class removed');
+}
+
+/* ---------------- students ---------------- */
+async function loadStudents(){
+  const {data} = await sb.from('v_students_roster').select('*')
+    .eq('status','active').order('level_order').order('name');
+  students = data||[]; renderStudents(); renderClasses();
+}
+function renderStudents(){
+  const cid = document.getElementById('fClass').value;
+  const q = document.getElementById('fSearch').value.trim().toLowerCase();
+  let list = students;
+  if(cid) list = list.filter(s=>s.class_id===cid);
+  if(q) list = list.filter(s=>
+    (s.name||'').toLowerCase().includes(q) ||
+    (s.father_name||'').toLowerCase().includes(q) ||
+    (s.admission_no||'').toLowerCase().includes(q));
+
+  document.getElementById('rosterCount').textContent =
+    `${list.length} of ${students.length} students`;
+
+  const box = document.getElementById('rosterWrap');
+  if(!list.length){
+    box.innerHTML = `<div class="empty"><b>No students</b>
+      Import the school's existing file, or add students one at a time.</div>`;
+    return;
+  }
+  box.innerHTML = `<table><thead><tr>
+      <th>Student</th><th class="hide-sm">Class</th><th class="hide-sm">Adm. No</th>
+      <th>WhatsApp</th><th class="hide-sm">Roll</th></tr></thead><tbody>` +
+    list.map(s=>`<tr>
+      <td><div class="nm">${esc(s.name)}</div><div class="fa">s/o ${esc(s.father_name)}</div></td>
+      <td class="hide-sm num">${esc(s.class_label)}</td>
+      <td class="hide-sm num" style="color:var(--ink-3)">${esc(s.admission_no)}</td>
+      <td class="num" style="${s.guardian_phone?'':'color:var(--oxide)'}">${
+        esc(s.guardian_phone||'missing')}</td>
+      <td class="hide-sm num">${esc(s.roll_no||'—')}</td>
+    </tr>`).join('') + '</tbody></table>';
+}
+
+function openStudent(){ fillSections(); dlgStudent.showModal(); }
+async function saveStudent(){
+  const name = document.getElementById('stName').value.trim();
+  const father = document.getElementById('stFather').value.trim();
+  if(!name || !father) return toast('Student and father name are required');
+  const row = {
+    school_id: school.id,
+    name, father_name: father,
+    class_id: document.getElementById('stClass').value||null,
+    section_id: document.getElementById('stSection').value||null,
+    roll_no: document.getElementById('stRoll').value.trim()||null,
+    guardian_phone: document.getElementById('stPhone').value.trim()||null,
+    guardian_cnic: document.getElementById('stCnic').value.replace(/\D/g,'')||null,
+    gender: document.getElementById('stGender').value||null,
+    dob: document.getElementById('stDob').value||null,
+    address: document.getElementById('stAddr').value.trim()||null,
+  };
+  let adm = document.getElementById('stAdm').value.trim();
+  if(!adm){
+    const {data} = await sb.rpc('next_admission_no',{p_school_id:school.id});
+    adm = data;
+  }
+  row.admission_no = adm;
+  const {error} = await sb.from('students').insert(row);
+  if(error) return toast(error.message);
+  dlgStudent.close();
+  ['stName','stFather','stAdm','stRoll','stPhone','stCnic','stAddr'].forEach(
+    id=>document.getElementById(id).value='');
+  await loadStudents(); toast('Student added');
+}
+
+/* ---------------- import ---------------- */
+const drop = document.getElementById('drop');
+['dragenter','dragover'].forEach(e=>drop.addEventListener(e,ev=>{
+  ev.preventDefault(); drop.classList.add('over')}));
+['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{
+  ev.preventDefault(); drop.classList.remove('over')}));
+drop.addEventListener('drop',ev=>{ if(ev.dataTransfer.files[0]) readFile(ev.dataTransfer.files[0]) });
+
+function readFile(f){
+  if(!f) return;
+  fileName = f.name;
+  const rd = new FileReader();
+  rd.onload = e=>{
+    const wb = XLSX.read(e.target.result,{type:'array',cellDates:true});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const grid = XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:''});
+
+    // find the header row: first row in the top 10 with 2+ non-empty text cells
+    let h = 0;
+    for(let i=0;i<Math.min(10,grid.length);i++){
+      const filled = grid[i].filter(c=>String(c).trim()!=='').length;
+      if(filled>=2){ h=i; break; }
+    }
+    headers = grid[h].map((c,i)=>String(c).trim() || `Column ${i+1}`);
+    raw = grid.slice(h+1)
+      .filter(r=>r.some(c=>String(c).trim()!==''))
+      .map((r,i)=>{ const o={_row:h+i+2}; headers.forEach((k,j)=>o[k]=r[j]??''); return o; });
+
+    if(!raw.length) return toast('No data rows found in that file');
+    autoMap(); step(2);
+    document.getElementById('fileInfo').textContent =
+      `${fileName} · ${raw.length} rows · header on row ${h+1}`;
+  };
+  rd.readAsArrayBuffer(f);
+}
+
+function autoMap(){
+  mapping = {};
+  const used = new Set();
+  FIELDS.forEach(([key])=>{
+    const cands = GUESS[key]||[];
+    const hit = headers.find(h=>{
+      if(used.has(h)) return false;
+      const l = h.toLowerCase().replace(/[^a-z\u0600-\u06FF ]/g,'').trim();
+      return cands.some(c=> l===c || l.startsWith(c) || l.includes(c));
+    });
+    if(hit){ mapping[key]=hit; used.add(hit); }
+  });
+  renderMap();
+}
+
+function renderMap(){
+  document.getElementById('mapRows').innerHTML = FIELDS.map(([key,label,req])=>{
+    const sample = mapping[key] ? String(raw[0][mapping[key]]??'').slice(0,32) : '';
+    return `<div class="maprow">
+      <div>
+        <div style="font-weight:600">${label}${req?' <span style="color:var(--oxide)">*</span>':''}</div>
+        <div class="src"><small>${sample?esc('e.g. '+sample):'&nbsp;'}</small></div>
+      </div>
+      <div class="arrow">&larr;</div>
+      <select onchange="mapping['${key}']=this.value||undefined;renderMap()">
+        <option value="">— not in file —</option>
+        ${headers.map(h=>`<option value="${esc(h)}" ${mapping[key]===h?'selected':''}>${esc(h)}</option>`).join('')}
+      </select>
+    </div>`;
+  }).join('');
+}
+
+function buildRows(){
+  return raw.map(r=>{
+    const o = {row:r._row};
+    FIELDS.forEach(([key])=>{
+      if(!mapping[key]) return;
+      let v = r[mapping[key]];
+      if(v instanceof Date) v = v.toISOString().slice(0,10);
+      o[key] = String(v??'').trim();
+    });
+    return o;
+  });
+}
+
+async function validate(){
+  if(!mapping.name || !mapping.father_name)
+    return toast('Match student name and father name first');
+  if(!configured) return toast('Connect Supabase first');
+
+  const {data,error} = await sb.rpc('import_students',{
+    p_rows: buildRows(), p_filename: fileName, p_dry_run: true,
+    p_update_existing: true, p_create_classes: true
+  });
+  if(error) return toast(error.message);
+  dry = data; showDry(); step(3);
+}
+
+function showDry(){
+  const errs = dry.errors||[];
+  const warns = errs.filter(e=>e.severity==='warning');
+  const hard  = errs.filter(e=>e.severity!=='warning');
+
+  document.getElementById('dryStats').innerHTML = `
+    <div class="stat"><div class="lbl">Rows read</div><div class="v">${dry.total}</div></div>
+    <div class="stat ok"><div class="lbl">Will be added</div><div class="v">${dry.inserted}</div></div>
+    <div class="stat"><div class="lbl">Will be updated</div><div class="v">${dry.updated}</div></div>
+    <div class="stat ${dry.failed?'bad':''}"><div class="lbl">Will be skipped</div><div class="v">${dry.failed}</div></div>`;
+
+  document.getElementById('errCount').textContent =
+    `${hard.length} blocking · ${warns.length} warnings`;
+
+  const box = document.getElementById('errList');
+  if(!errs.length){
+    box.innerHTML = `<div class="empty"><b>Nothing to fix</b>Every row is ready to save.</div>`;
+  } else {
+    box.innerHTML = [...hard,...warns].map(e=>`
+      <div class="err ${e.severity==='warning'?'warn':''}">
+        <div class="rw">row ${e.row}</div>
+        <div class="fl">${esc(e.field)}</div>
+        <div>${esc(e.message)}</div>
+      </div>`).join('');
+  }
+  document.getElementById('commitBtn').textContent =
+    `Save ${dry.inserted + dry.updated} students`;
+  document.getElementById('commitBtn').disabled = (dry.inserted + dry.updated)===0;
+}
+
+async function commit(){
+  const btn = document.getElementById('commitBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const {data,error} = await sb.rpc('import_students',{
+    p_rows: buildRows(), p_filename: fileName, p_dry_run: false,
+    p_update_existing: true, p_create_classes: true
+  });
+  btn.disabled = false;
+  if(error){ btn.textContent='Save students'; return toast(error.message); }
+
+  document.getElementById('finalStats').innerHTML = `
+    <div class="stat"><div class="lbl">Rows read</div><div class="v">${data.total}</div></div>
+    <div class="stat ok"><div class="lbl">Added</div><div class="v">${data.inserted}</div></div>
+    <div class="stat"><div class="lbl">Updated</div><div class="v">${data.updated}</div></div>
+    <div class="stat ${data.failed?'bad':''}"><div class="lbl">Skipped</div><div class="v">${data.failed}</div></div>`;
+  step(4);
+  await loadClasses(); await loadStudents();
+  toast(`${data.inserted} added, ${data.updated} updated`);
+}
+
+function step(n){
+  [1,2,3,4].forEach(i=>{
+    document.getElementById('i'+i).style.display = (i===n)?'block':'none';
+    const s = document.getElementById('s'+i);
+    s.classList.toggle('on', i===n);
+    s.classList.toggle('done', i<n);
+  });
+}
+function backTo(n){ step(n); }
+
+function go(i,btn){
+  document.querySelectorAll('.view').forEach((v,k)=>v.classList.toggle('on',k===i));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+boot();
+</script>
+</body>
+</html>

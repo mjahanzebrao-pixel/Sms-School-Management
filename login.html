@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in — School Management System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --ink:#14232E; --ink-2:#3D5261; --ink-3:#7C8F9B;
+  --paper:#FBFAF6; --ledger:#E7EDE5; --ledger-line:#CBD8C8; --rule:#D3D8D2;
+  --oxide:#A8332A; --oxide-soft:#F3E2E0; --seal:#2E6B4F;
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--paper);color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:15px;
+  display:grid;place-items:center;padding:24px}
+.card{width:min(400px,100%);border:1px solid var(--ink);background:#fff}
+.card .top{padding:22px 24px 18px;border-bottom:2px solid var(--ink);
+  display:flex;align-items:center;gap:13px}
+.crest{width:44px;height:44px;flex:none;border:1.5px solid var(--ink);display:grid;
+  place-items:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:19px}
+.top h1{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:600;
+  letter-spacing:.04em;margin:0;text-transform:uppercase;line-height:1.15}
+.top .sub{font-size:12px;color:var(--ink-3)}
+.body{padding:22px 24px 24px}
+.lbl{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
+  letter-spacing:.14em;font-weight:600;font-size:12px;color:var(--ink-3);
+  display:block;margin-bottom:5px}
+input{width:100%;padding:11px 12px;border:1px solid var(--rule);background:#fff;
+  color:var(--ink);font-family:inherit;font-size:15px;margin-bottom:15px}
+input:focus{outline:2px solid var(--oxide);outline-offset:-1px;border-color:var(--oxide)}
+button{width:100%;font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
+  letter-spacing:.14em;font-size:14px;font-weight:700;background:var(--ink);color:var(--paper);
+  border:0;padding:13px;cursor:pointer}
+button:hover{background:#0B1A24}
+button:disabled{opacity:.5;cursor:not-allowed}
+.msg{padding:10px 12px;font-size:13.5px;margin-bottom:15px;display:none}
+.msg.err{display:block;border:1px solid var(--oxide);background:var(--oxide-soft);color:#7A241D}
+.msg.ok{display:block;border:1px solid var(--seal);background:#E1EDE5;color:#1F4A36}
+.foot{margin-top:16px;font-size:12.5px;color:var(--ink-3);line-height:1.6}
+.foot code{font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--ledger);padding:1px 4px}
+:focus-visible{outline:2px solid var(--oxide);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="top">
+    <div class="crest">SM</div>
+    <div>
+      <h1>School Management</h1>
+      <div class="sub">Staff sign in</div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="msg" id="msg"></div>
+    <label class="lbl" for="email">Email</label>
+    <input type="email" id="email" autocomplete="username" placeholder="you@school.pk">
+    <label class="lbl" for="pass">Password</label>
+    <input type="password" id="pass" autocomplete="current-password"
+           onkeydown="if(event.key==='Enter')signIn()">
+    <button id="btn" onclick="signIn()">Sign in</button>
+    <div class="foot" id="foot"></div>
+  </div>
+</div>
+
+<script>
+const msg = document.getElementById('msg');
+const btn = document.getElementById('btn');
+
+function show(text, kind){ msg.textContent = text; msg.className = 'msg ' + kind; }
+
+if (!window.SMS_CONFIG || !SMS_CONFIG.url.startsWith('https://')) {
+  show('config.js is missing or still has placeholder values.', 'err');
+  btn.disabled = true;
+  document.getElementById('foot').innerHTML =
+    'Create <code>config.js</code> next to this file with your Supabase project URL and anon key.';
+} else {
+  const sb = supabase.createClient(SMS_CONFIG.url, SMS_CONFIG.anonKey);
+  window.sb = sb;
+
+  // already signed in? go straight through
+  sb.auth.getSession().then(({data:{session}})=>{
+    if(session) location.href = 'students.html';
+  });
+
+  window.signIn = async function(){
+    const email = document.getElementById('email').value.trim();
+    const pass  = document.getElementById('pass').value;
+    if(!email || !pass) return show('Enter your email and password.', 'err');
+
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    const {error} = await sb.auth.signInWithPassword({email, password: pass});
+    btn.disabled = false; btn.textContent = 'Sign in';
+
+    if(error) return show(error.message, 'err');
+
+    // confirm this user is attached to a school
+    const {data:profile} = await sb.from('profiles').select('name, role').limit(1).maybeSingle();
+    if(!profile){
+      await sb.auth.signOut();
+      return show('This account is not linked to a school yet. Run 000_bootstrap.sql.', 'err');
+    }
+    show(`Welcome, ${profile.name}.`, 'ok');
+    location.href = 'students.html';
+  };
+}
+</script>
+</body>
+</html>

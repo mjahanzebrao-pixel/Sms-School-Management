@@ -143,6 +143,13 @@ dialog::backdrop{background:rgba(20,35,46,.55)}
   justify-content:flex-end;gap:9px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 
+a.btn{text-decoration:none;display:inline-block}
+.nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.nav a.btn.here{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.secinput{display:inline-flex;gap:4px;align-items:center}
+.secinput input{width:78px;padding:3px 7px;margin:0;font-family:'IBM Plex Mono',monospace;font-size:12.5px}
+.secinput button{padding:3px 8px;font-size:11px}
+.hint{font-size:12px;color:var(--ink-3);margin-top:-7px;margin-bottom:12px}
 .empty{padding:44px 20px;text-align:center;color:var(--ink-3);font-size:14px}
 .empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:5px;
   font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.09em}
@@ -170,7 +177,11 @@ dialog::backdrop{background:rgba(20,35,46,.55)}
         <div class="sub" id="schoolSub">Connecting</div>
       </div>
     </div>
-    <div><button class="btn" onclick="location.reload()">Refresh</button></div>
+    <div class="nav">
+      <a class="btn here" href="students.html">Students</a>
+      <a class="btn" href="fees.html">Fees</a>
+      <button class="btn" onclick="smsSignOut()">Sign out</button>
+    </div>
   </div>
 
   <div class="tabs">
@@ -311,12 +322,13 @@ dialog::backdrop{background:rgba(20,35,46,.55)}
       <label class="field"><span class="lbl">Class</span><select id="stClass" onchange="fillSections()"></select></label>
       <label class="field"><span class="lbl">Section</span><select id="stSection"></select></label>
       <label class="field"><span class="lbl">Admission no</span>
-        <input type="text" id="stAdm" placeholder="leave blank to auto-generate"></label>
+        <input type="text" id="stAdm">
+        <span class="hint">Suggested next number — change it if the school uses its own.</span></label>
       <label class="field"><span class="lbl">Roll no</span><input type="text" id="stRoll"></label>
       <label class="field"><span class="lbl">Guardian WhatsApp</span>
-        <input type="text" id="stPhone" placeholder="0300 1234567"></label>
+        <input type="text" id="stPhone" placeholder="0300-1234567" maxlength="12" oninput="maskPhone(this)"></label>
       <label class="field"><span class="lbl">Guardian CNIC</span>
-        <input type="text" id="stCnic" placeholder="13 digits"></label>
+        <input type="text" id="stCnic" placeholder="36501-8727926-7" maxlength="15" oninput="maskCnic(this)"></label>
       <label class="field"><span class="lbl">Gender</span>
         <select id="stGender"><option value="">—</option><option value="male">Male</option>
         <option value="female">Female</option></select></label>
@@ -431,7 +443,7 @@ function renderClasses(){
         </div>
         <button class="btn danger" onclick="delClass('${c.id}')">Remove</button>
       </div>
-      <div class="secs">
+      <div class="secs" id="sec-${c.id}">
         ${mine.map(s=>`<span class="sec">${esc(s.name)}</span>`).join('')}
         <span class="sec add" onclick="addSection('${c.id}')">+ section</span>
       </div>
@@ -473,13 +485,49 @@ async function saveClass(){
   dlgClass.close(); document.getElementById('cName').value='';
   await loadClasses(); toast('Class added');
 }
-async function addSection(cid){
-  const name = prompt('Section name (A, B, Blue…)');
-  if(!name) return;
-  const {error} = await sb.from('sections').insert({
-    school_id:school.id, class_id:cid, name:name.trim().toUpperCase()});
-  if(error) return toast(error.message);
-  await loadClasses();
+function addSection(cid){
+  const box = document.getElementById('sec-'+cid);
+  if(!box || box.querySelector('.secinput')) return;
+  const trigger = box.querySelector('.sec.add');
+  if(trigger) trigger.style.display='none';
+
+  const wrap = document.createElement('span');
+  wrap.className = 'secinput';
+  wrap.innerHTML = `<input type="text" maxlength="12" placeholder="A" aria-label="Section name">
+    <button class="btn sm primary">Add</button>
+    <button class="btn sm">Cancel</button>`;
+  box.appendChild(wrap);
+
+  const [input, ok, cancel] = [wrap.querySelector('input'), ...wrap.querySelectorAll('button')];
+  input.focus();
+
+  const close = ()=>{ wrap.remove(); if(trigger) trigger.style.display=''; };
+  cancel.onclick = close;
+  input.onkeydown = e=>{ if(e.key==='Enter') ok.click(); if(e.key==='Escape') close(); };
+
+  ok.onclick = async ()=>{
+    const name = input.value.trim().toUpperCase();
+    if(!name) return input.focus();
+    ok.disabled = true;
+    const {error} = await sb.from('sections').insert({
+      school_id:school.id, class_id:cid, name});
+    if(error){ ok.disabled=false; return toast(error.message); }
+    close(); await loadClasses(); toast('Section '+name+' added');
+  };
+}
+
+/* CNIC: 36501-8727926-7 — 5 digits, 7 digits, 1 check digit */
+function maskCnic(el){
+  const d = el.value.replace(/\D/g,'').slice(0,13);
+  let out = d.slice(0,5);
+  if(d.length > 5)  out += '-' + d.slice(5,12);
+  if(d.length > 12) out += '-' + d.slice(12,13);
+  el.value = out;
+}
+/* Mobile: 0300-1234567 */
+function maskPhone(el){
+  const d = el.value.replace(/\D/g,'').slice(0,11);
+  el.value = d.length > 4 ? d.slice(0,4) + '-' + d.slice(4) : d;
 }
 async function delClass(id){
   const n = students.filter(s=>s.class_id===id).length;
@@ -528,7 +576,14 @@ function renderStudents(){
     </tr>`).join('') + '</tbody></table>';
 }
 
-function openStudent(){ fillSections(); dlgStudent.showModal(); }
+async function openStudent(){
+  fillSections();
+  const adm = document.getElementById('stAdm');
+  adm.value = 'generating…'; adm.disabled = true;
+  dlgStudent.showModal();
+  const {data} = await sb.rpc('next_admission_no',{p_school_id:school.id});
+  adm.value = data || ''; adm.disabled = false;
+}
 async function saveStudent(){
   const name = document.getElementById('stName').value.trim();
   const father = document.getElementById('stFather').value.trim();

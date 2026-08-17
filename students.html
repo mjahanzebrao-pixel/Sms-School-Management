@@ -181,6 +181,7 @@ a.btn{text-decoration:none;display:inline-block}
       <a class="btn here" href="students.html">Students</a>
       <a class="btn" href="fees.html">Fees</a>
       <a class="btn" href="challans.html">Challans</a>
+      <a class="btn" href="payments.html">Deposit</a>
       <button class="btn" onclick="smsSignOut()">Sign out</button>
     </div>
   </div>
@@ -213,7 +214,7 @@ a.btn{text-decoration:none;display:inline-block}
       <h2>Students</h2>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select id="fClass" onchange="renderStudents()" style="width:auto"><option value="">All classes</option></select>
-        <input type="text" id="fSearch" placeholder="Name, father or adm. no" oninput="renderStudents()" style="width:230px">
+        <input type="text" id="fSearch" placeholder="Name, father, roll, adm, CNIC, CRC" oninput="renderStudents()" style="width:230px">
         <button class="btn primary" onclick="openStudent()">Add student</button>
       </div>
     </div>
@@ -328,8 +329,10 @@ a.btn{text-decoration:none;display:inline-block}
       <label class="field"><span class="lbl">Roll no</span><input type="text" id="stRoll"></label>
       <label class="field"><span class="lbl">Guardian WhatsApp</span>
         <input type="text" id="stPhone" placeholder="0300-1234567" maxlength="12" oninput="maskPhone(this)"></label>
-      <label class="field"><span class="lbl">Guardian CNIC</span>
+      <label class="field"><span class="lbl">Father CNIC</span>
         <input type="text" id="stCnic" placeholder="36501-8727926-7" maxlength="15" oninput="maskCnic(this)"></label>
+      <label class="field"><span class="lbl">B-Form / CRC</span>
+        <input type="text" id="stBform" placeholder="36501-1234567-8" maxlength="15" oninput="maskCnic(this)"></label>
       <label class="field"><span class="lbl">Gender</span>
         <select id="stGender"><option value="">—</option><option value="male">Male</option>
         <option value="female">Female</option></select></label>
@@ -365,7 +368,7 @@ const FIELDS = [
   ['guardian_name',  'Guardian name',     false],
   ['guardian_phone', 'Guardian WhatsApp', false],
   ['cnic',           'Guardian CNIC',     false],
-  ['b_form',         'B-Form',            false],
+  ['b_form',         'B-Form / CRC',      false],
   ['gender',         'Gender',            false],
   ['dob',            'Date of birth',     false],
   ['address',        'Address',           false],
@@ -383,7 +386,7 @@ const GUESS = {
   guardian_name:['guardian','guardian name','parent','parent name'],
   guardian_phone:['phone','mobile','contact','cell','whatsapp','contact no','mobile no','number'],
   cnic:['cnic','nic','id card','cnic no'],
-  b_form:['b form','b-form','bform','child cnic','form b'],
+  b_form:['b form','b-form','bform','child cnic','form b','crc','crc no','child registration'],
   gender:['gender','sex','m/f'],
   dob:['dob','date of birth','birth date','birthday'],
   address:['address','addr','residence','pata'],
@@ -550,10 +553,17 @@ function renderStudents(){
   const q = document.getElementById('fSearch').value.trim().toLowerCase();
   let list = students;
   if(cid) list = list.filter(s=>s.class_id===cid);
-  if(q) list = list.filter(s=>
-    (s.name||'').toLowerCase().includes(q) ||
-    (s.father_name||'').toLowerCase().includes(q) ||
-    (s.admission_no||'').toLowerCase().includes(q));
+  if(q){
+    const qd = q.replace(/\D/g,'');
+    list = list.filter(s=>
+      (s.name||'').toLowerCase().includes(q) ||
+      (s.father_name||'').toLowerCase().includes(q) ||
+      (s.admission_no||'').toLowerCase().includes(q) ||
+      (s.roll_no||'').toLowerCase().includes(q) ||
+      (qd.length>=4 && (s.guardian_cnic||'').includes(qd)) ||
+      (qd.length>=4 && (s.b_form||'').includes(qd)) ||
+      (qd.length>=4 && (s.guardian_phone||'').replace(/\D/g,'').includes(qd)));
+  }
 
   document.getElementById('rosterCount').textContent =
     `${list.length} of ${students.length} students`;
@@ -597,6 +607,7 @@ async function saveStudent(){
     roll_no: document.getElementById('stRoll').value.trim()||null,
     guardian_phone: document.getElementById('stPhone').value.trim()||null,
     guardian_cnic: document.getElementById('stCnic').value.replace(/\D/g,'')||null,
+    b_form: document.getElementById('stBform').value.replace(/\D/g,'')||null,
     gender: document.getElementById('stGender').value||null,
     dob: document.getElementById('stDob').value||null,
     address: document.getElementById('stAddr').value.trim()||null,
@@ -610,7 +621,7 @@ async function saveStudent(){
   const {error} = await sb.from('students').insert(row);
   if(error) return toast(error.message);
   dlgStudent.close();
-  ['stName','stFather','stAdm','stRoll','stPhone','stCnic','stAddr'].forEach(
+  ['stName','stFather','stAdm','stRoll','stPhone','stCnic','stBform','stAddr'].forEach(
     id=>document.getElementById(id).value='');
   await loadStudents(); toast('Student added');
 }

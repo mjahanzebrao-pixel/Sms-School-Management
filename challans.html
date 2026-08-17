@@ -509,7 +509,7 @@ function renderRegister(){
       <th class="hide-sm">Class</th><th class="r">Arrears</th>
       <th class="r">Payable</th><th class="r hide-sm">Fine now</th><th>Status</th>
     </tr></thead><tbody>` + list.map(r=>`<tr>
-      <td><input type="checkbox" class="rowpick" value="${r.id}"></td>
+      <td><input type="checkbox" class="rowpick" value="${r.id}" onchange="updatePrintBtn()"></td>
       <td class="num" style="font-size:12.5px">${esc(r.challan_no)}</td>
       <td><div class="nm">${esc(r.student_name)}</div><div class="fa">s/o ${esc(r.father_name)}</div></td>
       <td class="hide-sm num">${esc(r.class_name||'—')}${r.section_name?'-'+esc(r.section_name):''}</td>
@@ -517,11 +517,28 @@ function renderRegister(){
       <td class="r" style="font-weight:600">${rs(r.total)}</td>
       <td class="r hide-sm" style="color:${r.fine_now>0?'var(--oxide)':'var(--ink-3)'}">${r.fine_now>0?rs(r.fine_now):'—'}</td>
       <td><span class="pill ${r.status}">${r.status==='partial'?'Part paid':r.status}</span></td>
+      <td style="text-align:right"><button class="btn sm" onclick="printOne('${r.id}')">Print</button></td>
     </tr>`).join('') + '</tbody></table>';
+
+  updatePrintBtn();
 }
 
 function pickAllRows(on){
   document.querySelectorAll('.rowpick').forEach(c=>c.checked=on);
+  updatePrintBtn();
+}
+
+function updatePrintBtn(){
+  const n = document.querySelectorAll('.rowpick:checked').length;
+  const b = document.getElementById('printBtn');
+  if(!b) return;
+  b.disabled = n === 0;
+  b.textContent = n ? `Print ${n} selected` : 'Print selected';
+}
+
+function printOne(id){
+  const r = register.find(x=>x.id===id);
+  if(r) renderPrint([r]);
 }
 
 /* ---------------- printing ---------------- */
@@ -649,9 +666,11 @@ function numWords(v){
 
 function printSelected(){
   const ids = [...document.querySelectorAll('.rowpick:checked')].map(c=>c.value);
-  if(!ids.length) return toast('Select at least one challan');
-  const rows = register.filter(r=>ids.includes(r.id));
+  if(!ids.length) return toast('Tick a challan first, or use the Print button on a row');
+  renderPrint(register.filter(r=>ids.includes(r.id)));
+}
 
+function renderPrint(rows){
   const body = rows.map(r=>
     `<div class="sheet">
        ${copyHtml(r, COPIES[0][0], COPIES[0][1], COPIES[0][2])}

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Attendance — School Management System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --ink:#14232E; --ink-2:#3D5261; --ink-3:#7C8F9B;
+  --paper:#FBFAF6; --ledger:#E7EDE5; --ledger-line:#CBD8C8; --rule:#D3D8D2;
+  --oxide:#A8332A; --oxide-soft:#F3E2E0;
+  --seal:#2E6B4F; --seal-soft:#E1EDE5;
+  --amber:#9A6B12; --amber-soft:#F6EBD5;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased}
+.num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.lbl{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
+  letter-spacing:.14em;font-weight:600;font-size:12px;color:var(--ink-3)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 18px 110px}
+
+.topbar{border-bottom:2px solid var(--ink);padding:16px 0 12px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.crest{width:38px;height:38px;flex:none;border:1.5px solid var(--ink);display:grid;
+  place-items:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px}
+.brand h1{font-family:'Barlow Condensed',sans-serif;font-size:23px;font-weight:600;
+  letter-spacing:.03em;margin:0;text-transform:uppercase}
+.brand .sub{font-size:12px;color:var(--ink-3);margin-top:-2px}
+a.btn{text-decoration:none;display:inline-block}
+.nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.nav a.btn.here{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+.tabs{display:flex;border-bottom:1px solid var(--rule);overflow-x:auto}
+.tab{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.13em;
+  font-size:13px;font-weight:600;color:var(--ink-3);background:none;border:0;
+  border-bottom:3px solid transparent;padding:13px 18px 10px;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);border-bottom-color:var(--oxide)}
+.view{display:none;padding-top:24px}
+.view.on{display:block}
+
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+  flex-wrap:wrap;margin-bottom:16px}
+.head h2{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:600;
+  letter-spacing:.02em;margin:0;text-transform:uppercase}
+
+button,select,input{font-family:inherit;font-size:14px}
+.btn{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.12em;
+  font-size:12.5px;font-weight:600;border:1px solid var(--rule);background:#fff;
+  color:var(--ink-2);padding:9px 14px;cursor:pointer}
+.btn:hover{border-color:var(--ink);color:var(--ink)}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.go{background:var(--seal);color:#fff;border-color:var(--seal)}
+.btn.sm{padding:5px 9px;font-size:11.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+select,input[type=date],input[type=text]{
+  padding:9px 11px;border:1px solid var(--rule);background:#fff;color:var(--ink)}
+select:focus,input:focus{outline:2px solid var(--oxide);outline-offset:-1px;border-color:var(--oxide)}
+
+.panel{border:1px solid var(--rule);background:#fff}
+.panelhead{padding:11px 14px;border-bottom:1px solid var(--rule);
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse}
+thead th{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.13em;
+  font-size:11.5px;font-weight:600;color:var(--ink-3);text-align:left;padding:11px 12px;
+  border-bottom:1.5px solid var(--ink);white-space:nowrap}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--ledger-line);font-size:14px}
+tbody tr:nth-child(even){background:var(--ledger)}
+td.r,th.r{text-align:right}
+td.r{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+
+.pickers{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+
+/* register rows — big tap targets */
+.reg{border:1px solid var(--rule);background:#fff}
+.rrow{display:flex;align-items:center;gap:12px;padding:11px 14px;
+  border-bottom:1px solid var(--ledger-line)}
+.rrow:last-child{border-bottom:0}
+.rrow .rn{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink-3);
+  width:26px;flex:none}
+.rrow .who{flex:1;min-width:0}
+.rrow .who b{display:block;font-weight:600;font-size:15px}
+.rrow .who small{color:var(--ink-3);font-size:12.5px}
+.marks{display:flex;gap:5px;flex:none}
+.mk{width:42px;height:38px;border:1px solid var(--rule);background:#fff;
+  font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;
+  color:var(--ink-3);cursor:pointer;letter-spacing:.04em}
+.mk:hover{border-color:var(--ink)}
+.mk.on{color:#fff}
+.mk.p.on{background:var(--seal);border-color:var(--seal)}
+.mk.a.on{background:var(--oxide);border-color:var(--oxide)}
+.mk.l.on{background:var(--amber);border-color:var(--amber)}
+.mk.t.on{background:var(--ink-2);border-color:var(--ink-2)}
+.rrow.absent{background:var(--oxide-soft)}
+.rrow.leave{background:var(--amber-soft)}
+.rrow.late{background:var(--ledger)}
+
+.savebar{position:sticky;bottom:0;background:var(--ink);color:var(--paper);
+  padding:13px 16px;display:flex;justify-content:space-between;align-items:center;
+  gap:14px;flex-wrap:wrap}
+.tallies{display:flex;gap:16px;font-family:'IBM Plex Mono',monospace;font-size:14px}
+.tallies b{font-weight:600}
+.tallies .a{color:#F0999A}
+.tallies .l{color:#F6D08A}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);
+  border:1px solid var(--rule);margin-bottom:20px}
+.stat{background:#fff;padding:14px}
+.stat .v{font-family:'IBM Plex Mono',monospace;font-size:23px;font-weight:600;margin-top:4px}
+.stat.bad .v{color:var(--oxide)}
+.stat.ok .v{color:var(--seal)}
+
+.pill{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.1em;
+  font-size:11px;font-weight:600;padding:3px 7px;border:1px solid}
+.pill.done{color:var(--seal);border-color:var(--seal);background:var(--seal-soft)}
+.pill.todo{color:var(--oxide);border-color:var(--oxide);background:var(--oxide-soft)}
+
+.bar{height:18px;background:var(--ledger);border:1px solid var(--ledger-line);
+  position:relative;min-width:90px}
+.bar i{display:block;height:100%;background:var(--seal)}
+.bar.low i{background:var(--oxide)}
+.bar span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600}
+
+.offline{background:var(--amber-soft);border:1px solid var(--amber);color:#5C420B;
+  padding:9px 14px;font-size:13.5px;margin-bottom:14px;display:none}
+.offline.on{display:block}
+.banner{border:1px solid var(--amber);background:var(--amber-soft);color:#5C420B;
+  padding:11px 14px;font-size:13.5px;margin:18px 0}
+.empty{padding:44px 20px;text-align:center;color:var(--ink-3);font-size:14px}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:5px;
+  font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.09em}
+.toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);background:var(--ink);
+  color:var(--paper);padding:12px 20px;font-size:14px;z-index:99;display:none}
+
+@media(max-width:820px){
+  .stats{grid-template-columns:1fr 1fr}
+  .hide-sm{display:none}
+  .mk{width:38px;height:40px}
+}
+:focus-visible{outline:2px solid var(--oxide);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="crest" id="crest">··</div>
+      <div>
+        <h1 id="schoolName">Loading…</h1>
+        <div class="sub" id="schoolSub">Connecting</div>
+      </div>
+    </div>
+    <div class="nav">
+      <a class="btn" href="students.html">Students</a>
+      <a class="btn" href="fees.html">Fees</a>
+      <a class="btn" href="challans.html">Challans</a>
+      <a class="btn" href="payments.html">Deposit</a>
+      <a class="btn" href="reminders.html">Reminders</a>
+      <a class="btn here" href="attendance.html">Attendance</a>
+      <button class="btn" onclick="smsSignOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" onclick="go(0,this)">Mark Register</button>
+    <button class="tab" onclick="go(1,this)">Today's Status</button>
+    <button class="tab" onclick="go(2,this)">Monthly Report</button>
+  </div>
+
+  <div class="offline" id="offline">
+    Working offline. Marked registers are held on this device and sent when the connection returns.
+  </div>
+
+  <!-- ============ MARK ============ -->
+  <section class="view on">
+    <div class="head"><h2>Mark Register</h2>
+      <div class="lbl">Everyone present — tap only the exceptions</div></div>
+
+    <div class="pickers">
+      <select id="pClass" onchange="fillSections()"></select>
+      <select id="pSection" onchange="loadRegister()"></select>
+      <input type="date" id="pDate" onchange="loadRegister()">
+      <button class="btn sm" onclick="allPresent()">Reset all present</button>
+    </div>
+
+    <div id="regBox"></div>
+  </section>
+
+  <!-- ============ TODAY ============ -->
+  <section class="view">
+    <div class="head"><h2>Today's Status</h2>
+      <div class="lbl" id="todayDate">—</div></div>
+    <div class="stats" id="todayStats"></div>
+    <div class="panel">
+      <div class="panelhead"><div class="lbl">Sections</div>
+        <button class="btn sm" onclick="loadToday()">Refresh</button></div>
+      <div id="todayBox"></div>
+    </div>
+    <div class="panel" style="margin-top:22px">
+      <div class="panelhead"><div class="lbl">Absent today</div>
+        <div class="lbl" id="absCount">—</div></div>
+      <div id="absBox"></div>
+    </div>
+  </section>
+
+  <!-- ============ MONTHLY ============ -->
+  <section class="view">
+    <div class="head">
+      <h2>Monthly Report</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select id="mMonth" onchange="loadMonthly()"></select>
+        <select id="mYear" onchange="loadMonthly()"></select>
+        <select id="mClass" onchange="renderMonthly()"></select>
+      </div>
+    </div>
+    <div class="stats" id="mStats"></div>
+    <div class="panel">
+      <div class="panelhead"><div class="lbl" id="mCount">—</div>
+        <button class="btn sm" onclick="printMonthly()">Print</button></div>
+      <div id="mBox"></div>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const configured = !!(window.SMS_CONFIG && SMS_CONFIG.url.startsWith('https://'));
+const sb = configured ? supabase.createClient(SMS_CONFIG.url, SMS_CONFIG.anonKey) : null;
+
+const QKEY='sms_attendance_queue';
+let school=null, classes=[], sections=[], roster=[], marks={}, monthly=[];
+
+const MONTHS=['January','February','March','April','May','June','July','August',
+  'September','October','November','December'];
+const STATUS=[['present','P','p'],['absent','A','a'],['leave','L','l'],['late','T','t']];
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';
+  clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2800)}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function fmtd(d){if(!d)return '—';const [y,m,dd]=String(d).slice(0,10).split('-');return `${dd}-${m}-${y}`}
+
+function toWa(raw){
+  let d=String(raw||'').replace(/\D/g,'');
+  if(d.startsWith('0092')) d=d.slice(4);
+  else if(d.startsWith('92') && d.length===12) d=d.slice(2);
+  else if(d.startsWith('0') && d.length===11) d=d.slice(1);
+  if(d.length===10 && d.startsWith('3')) return '92'+d;
+  return '';
+}
+const isMobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
+function waUrl(phone,text){
+  const n=toWa(phone); if(!n) return '';
+  return isMobile ? `https://wa.me/${n}?text=${encodeURIComponent(text)}`
+                  : `https://web.whatsapp.com/send?phone=${n}&text=${encodeURIComponent(text)}`;
+}
+
+/* ---------------- offline queue ---------------- */
+function qRead(){try{return JSON.parse(localStorage.getItem(QKEY)||'[]')}catch{return []}}
+function qWrite(v){try{localStorage.setItem(QKEY,JSON.stringify(v))}catch{}}
+function qPush(item){const q=qRead();q.push(item);qWrite(q);showOffline()}
+function showOffline(){
+  const q=qRead();
+  const el=document.getElementById('offline');
+  el.classList.toggle('on', !navigator.onLine || q.length>0);
+  if(q.length) el.textContent =
+    `${q.length} register${q.length===1?'':'s'} waiting to sync. They will send automatically when the connection returns.`;
+  else el.textContent =
+    'Working offline. Marked registers are held on this device and sent when the connection returns.';
+}
+async function qFlush(){
+  const q=qRead();
+  if(!q.length || !navigator.onLine) return;
+  const left=[];
+  for(const item of q){
+    const {error}=await sb.rpc('mark_attendance',
+      {p_section_id:item.section_id, p_date:item.date, p_marks:item.marks});
+    if(error) left.push(item);
+  }
+  qWrite(left);
+  showOffline();
+  if(q.length>left.length) toast(`${q.length-left.length} register(s) synced`);
+}
+window.addEventListener('online', ()=>{showOffline();qFlush()});
+window.addEventListener('offline', showOffline);
+
+/* ---------------- boot ---------------- */
+async function boot(){
+  if(!configured){document.getElementById('schoolName').textContent='Not connected';return}
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){location.href='login.html';return}
+
+  const {data:s}=await sb.from('schools').select('*').limit(1).maybeSingle();
+  school=s;
+  if(school){
+    document.getElementById('schoolName').textContent=school.name;
+    document.getElementById('schoolSub').textContent=
+      `${school.address||''} · Session ${school.academic_year}`;
+    document.getElementById('crest').textContent=
+      school.name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+  }
+
+  const {data:c}=await sb.from('classes').select('*').order('level_order');
+  const {data:sec}=await sb.from('sections').select('*').order('name');
+  classes=c||[]; sections=sec||[];
+
+  document.getElementById('pClass').innerHTML=
+    classes.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+  document.getElementById('mClass').innerHTML='<option value="">All classes</option>'+
+    classes.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+
+  const now=new Date(), y=now.getFullYear(), m=now.getMonth()+1;
+  document.getElementById('pDate').value=now.toISOString().slice(0,10);
+  document.getElementById('pDate').max=now.toISOString().slice(0,10);
+  document.getElementById('mMonth').innerHTML=
+    MONTHS.map((n,i)=>`<option value="${i+1}" ${i+1===m?'selected':''}>${n}</option>`).join('');
+  document.getElementById('mYear').innerHTML=
+    [y-1,y].map(v=>`<option value="${v}" ${v===y?'selected':''}>${v}</option>`).join('');
+  document.getElementById('todayDate').textContent=fmtd(now.toISOString());
+
+  fillSections();
+  showOffline(); qFlush();
+  await loadToday();
+  await loadMonthly();
+}
+
+function fillSections(){
+  const cid=document.getElementById('pClass').value;
+  const mine=sections.filter(x=>x.class_id===cid);
+  document.getElementById('pSection').innerHTML=
+    mine.map(x=>`<option value="${x.id}">Section ${esc(x.name)}</option>`).join('')
+    || '<option value="">No sections</option>';
+  loadRegister();
+}
+
+/* ---------------- register ---------------- */
+async function loadRegister(){
+  const sid=document.getElementById('pSection').value;
+  const date=document.getElementById('pDate').value;
+  const box=document.getElementById('regBox');
+  if(!sid){box.innerHTML=`<div class="panel"><div class="empty"><b>No section</b>
+    Add a section to this class first.</div></div>`;return}
+
+  const {data:st}=await sb.from('v_students_roster').select('*')
+    .eq('section_id',sid).eq('status','active').order('roll_no').order('name');
+  roster=st||[];
+
+  marks={};
+  const {data:prev}=await sb.from('attendance').select('student_id,status')
+    .eq('section_id',sid).eq('att_date',date);
+  (prev||[]).forEach(a=>{ if(a.status!=='present') marks[a.student_id]=a.status; });
+
+  renderRegister((prev||[]).length>0);
+}
+
+function renderRegister(alreadyMarked){
+  const box=document.getElementById('regBox');
+  if(!roster.length){
+    box.innerHTML=`<div class="panel"><div class="empty"><b>No students</b>
+      Nobody is assigned to this section yet.</div></div>`;
+    return;
+  }
+  box.innerHTML=`
+    ${alreadyMarked?`<div class="banner">This register was already marked for this date. Saving again replaces it.</div>`:''}
+    <div class="reg">${roster.map((s,i)=>{
+      const cur=marks[s.id]||'present';
+      return `<div class="rrow ${cur!=='present'?cur:''}" id="row-${s.id}">
+        <div class="rn">${s.roll_no||i+1}</div>
+        <div class="who"><b>${esc(s.name)}</b><small>s/o ${esc(s.father_name)}</small></div>
+        <div class="marks">${STATUS.map(([v,ch,cls])=>
+          `<button class="mk ${cls} ${cur===v?'on':''}" data-s="${s.id}" data-v="${v}"
+             onclick="setMark('${s.id}','${v}')" title="${v}">${ch}</button>`).join('')}</div>
+      </div>`}).join('')}
+    </div>
+    <div class="savebar">
+      <div class="tallies" id="tallies"></div>
+      <button class="btn go" onclick="saveRegister()">Save register</button>
+    </div>`;
+  tally();
+}
+
+function setMark(id,val){
+  if(val==='present') delete marks[id]; else marks[id]=val;
+  const row=document.getElementById('row-'+id);
+  row.className='rrow '+(val!=='present'?val:'');
+  row.querySelectorAll('.mk').forEach(b=>b.classList.toggle('on', b.dataset.v===val));
+  tally();
+}
+
+function allPresent(){
+  marks={};
+  renderRegister(false);
+  toast('All marked present');
+}
+
+function tally(){
+  const total=roster.length;
+  const a=Object.values(marks).filter(v=>v==='absent').length;
+  const l=Object.values(marks).filter(v=>v==='leave').length;
+  const t=Object.values(marks).filter(v=>v==='late').length;
+  const p=total-a-l-t;
+  const el=document.getElementById('tallies');
+  if(el) el.innerHTML=
+    `<span>Present <b>${p}</b></span>
+     <span class="a">Absent <b>${a}</b></span>
+     <span class="l">Leave <b>${l}</b></span>
+     <span>Late <b>${t}</b></span>
+     <span style="opacity:.6">of ${total}</span>`;
+}
+
+async function saveRegister(){
+  const sid=document.getElementById('pSection').value;
+  const date=document.getElementById('pDate').value;
+  const payload=Object.entries(marks).map(([student_id,status])=>({student_id,status}));
+
+  if(!navigator.onLine){
+    qPush({section_id:sid, date, marks:payload});
+    return toast('Saved on this device — will sync when online');
+  }
+
+  const {data,error}=await sb.rpc('mark_attendance',
+    {p_section_id:sid, p_date:date, p_marks:payload});
+  if(error){
+    qPush({section_id:sid, date, marks:payload});
+    return toast('Could not reach the server — held on this device');
+  }
+  toast(`Saved · ${data.present} present, ${data.absent} absent`);
+  await loadToday();
+}
+
+/* ---------------- today ---------------- */
+async function loadToday(){
+  const {data}=await sb.from('v_attendance_status').select('*').order('level_order');
+  const list=data||[];
+  const done=list.filter(r=>r.att_date);
+  const strength=list.reduce((s,r)=>s+Number(r.strength||0),0);
+  const present=done.reduce((s,r)=>s+Number(r.present||0),0);
+  const absent=done.reduce((s,r)=>s+Number(r.absent||0),0);
+
+  document.getElementById('todayStats').innerHTML=`
+    <div class="stat ${done.length<list.length?'bad':'ok'}">
+      <div class="lbl">Sections marked</div><div class="v">${done.length}/${list.length}</div></div>
+    <div class="stat ok"><div class="lbl">Present</div><div class="v">${present}</div></div>
+    <div class="stat bad"><div class="lbl">Absent</div><div class="v">${absent}</div></div>
+    <div class="stat"><div class="lbl">Total strength</div><div class="v">${strength}</div></div>`;
+
+  document.getElementById('todayBox').innerHTML = list.length ? `<table><thead><tr>
+      <th>Section</th><th class="r">Strength</th><th class="r">Present</th>
+      <th class="r">Absent</th><th class="hide-sm">Marked by</th><th>Status</th>
+    </tr></thead><tbody>`+list.map(r=>`<tr>
+      <td style="font-weight:600">${esc(r.class_name)}-${esc(r.section_name)}</td>
+      <td class="r">${r.strength}</td>
+      <td class="r" style="color:var(--seal)">${r.att_date?r.present:'—'}</td>
+      <td class="r" style="color:var(--oxide)">${r.att_date?r.absent:'—'}</td>
+      <td class="hide-sm" style="font-size:13px;color:var(--ink-3)">${esc(r.marked_by_name||'—')}</td>
+      <td><span class="pill ${r.att_date?'done':'todo'}">${r.att_date?'Marked':'Pending'}</span></td>
+    </tr>`).join('')+'</tbody></table>'
+    : `<div class="empty"><b>No sections</b>Set up classes and sections first.</div>`;
+
+  const today=new Date().toISOString().slice(0,10);
+  const {data:abs}=await sb.from('v_absent_today').select('*')
+    .eq('att_date',today).order('class_name');
+  const alist=abs||[];
+  document.getElementById('absCount').textContent=`${alist.length} student${alist.length===1?'':'s'}`;
+  document.getElementById('absBox').innerHTML = alist.length ? `<table><thead><tr>
+      <th>Student</th><th class="hide-sm">Class</th><th>Status</th><th class="hide-sm">Guardian</th><th></th>
+    </tr></thead><tbody>`+alist.map(r=>`<tr>
+      <td><div style="font-weight:600">${esc(r.name)}</div>
+        <div style="color:var(--ink-3);font-size:12.5px">s/o ${esc(r.father_name)}</div></td>
+      <td class="hide-sm num">${esc(r.class_name||'—')}-${esc(r.section_name||'')}</td>
+      <td><span class="pill ${r.status==='absent'?'todo':'done'}">${r.status}</span></td>
+      <td class="hide-sm num" style="font-size:13px">${esc(r.guardian_phone||'—')}</td>
+      <td style="text-align:right">${toWa(r.guardian_phone)
+        ?`<button class="btn sm" onclick="waAbsent('${r.student_id}')">WhatsApp</button>`:''}</td>
+    </tr>`).join('')+'</tbody></table>'
+    : `<div class="empty">Nobody absent today.</div>`;
+  window._abs=alist;
+}
+
+function waAbsent(id){
+  const r=(window._abs||[]).find(x=>x.student_id===id);
+  if(!r) return;
+  const msg=`Assalam-o-Alaikum ${r.father_name} sahib,\n\n`+
+    `${r.name} (Class ${r.class_name||''}${r.section_name?'-'+r.section_name:''}) aaj school nahi aaye.\n\n`+
+    `Baraye meherbani school office se rabta karein.\n\n— ${school.name}`;
+  const url=waUrl(r.guardian_phone,msg);
+  if(!url) return toast(`"${r.guardian_phone}" is not a valid Pakistani mobile`);
+  window.open(url,'_blank');
+}
+
+/* ---------------- monthly ---------------- */
+async function loadMonthly(){
+  const {data}=await sb.from('v_attendance_monthly').select('*')
+    .eq('att_month',+document.getElementById('mMonth').value)
+    .eq('att_year',+document.getElementById('mYear').value)
+    .order('percent');
+  monthly=data||[];
+  renderMonthly();
+}
+
+function renderMonthly(){
+  const cid=document.getElementById('mClass').value;
+  const cname=(classes.find(c=>c.id===cid)||{}).name;
+  let list=monthly;
+  if(cid) list=list.filter(r=>r.class_name===cname);
+
+  const avg=list.length?list.reduce((s,r)=>s+Number(r.percent||0),0)/list.length:0;
+  const low=list.filter(r=>Number(r.percent)<75).length;
+  const days=list.length?Math.max(...list.map(r=>r.days_marked)):0;
+
+  document.getElementById('mStats').innerHTML=`
+    <div class="stat ${avg<85?'bad':'ok'}"><div class="lbl">Average attendance</div>
+      <div class="v">${avg.toFixed(1)}%</div></div>
+    <div class="stat"><div class="lbl">Students</div><div class="v">${list.length}</div></div>
+    <div class="stat bad"><div class="lbl">Below 75%</div><div class="v">${low}</div></div>
+    <div class="stat"><div class="lbl">Days marked</div><div class="v">${days}</div></div>`;
+
+  document.getElementById('mCount').textContent=`${list.length} students`;
+  document.getElementById('mBox').innerHTML = list.length ? `<table><thead><tr>
+      <th>Student</th><th class="hide-sm">Class</th><th class="r">Present</th>
+      <th class="r">Absent</th><th class="r hide-sm">Leave</th><th>Attendance</th>
+    </tr></thead><tbody>`+list.map(r=>{
+      const p=Number(r.percent||0);
+      return `<tr>
+      <td><div style="font-weight:600">${esc(r.name)}</div>
+        <div style="color:var(--ink-3);font-size:12.5px">${esc(r.admission_no)}</div></td>
+      <td class="hide-sm num">${esc(r.class_name||'—')}${r.section_name?'-'+esc(r.section_name):''}</td>
+      <td class="r" style="color:var(--seal)">${r.present}</td>
+      <td class="r" style="color:var(--oxide)">${r.absent}</td>
+      <td class="r hide-sm">${r.on_leave}</td>
+      <td><div class="bar ${p<75?'low':''}"><i style="width:${p}%"></i><span>${p}%</span></div></td>
+    </tr>`}).join('')+'</tbody></table>'
+    : `<div class="empty"><b>No attendance recorded</b>Mark a register for this month first.</div>`;
+  window._monthly=list;
+}
+
+function printMonthly(){
+  const list=window._monthly||[];
+  if(!list.length) return toast('Nothing to print');
+  const mn=MONTHS[+document.getElementById('mMonth').value-1];
+  const yr=document.getElementById('mYear').value;
+  const win=window.open('','_blank');
+  if(!win) return toast('Allow pop-ups, then print again');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Attendance ${mn} ${yr}</title><style>
+@page{size:A4;margin:12mm}
+body{font-family:system-ui,sans-serif;color:#000;margin:0}
+h1{font-size:15pt;margin:0 0 1mm;text-transform:uppercase;letter-spacing:.04em}
+.s{font-size:9pt;color:#555;margin-bottom:6mm}
+table{width:100%;border-collapse:collapse;font-size:9pt}
+th{text-align:left;border-bottom:.5mm solid #000;padding:2mm 1mm;font-size:7.5pt;
+  text-transform:uppercase;letter-spacing:.1em}
+td{padding:1.6mm 1mm;border-bottom:.2mm dotted #999}
+td.r,th.r{text-align:right}
+.low{color:#A8332A;font-weight:700}
+.sig{margin-top:12mm;display:flex;justify-content:space-between;font-size:9pt}
+.sig div{border-top:.3mm solid #000;width:55mm;text-align:center;padding-top:2mm}
+</style></head><body>
+<h1>${esc(school.name)} — Attendance Report</h1>
+<div class="s">${mn} ${yr} · ${list.length} students</div>
+<table><thead><tr><th>Student</th><th>Adm No</th><th>Class</th>
+<th class="r">Days</th><th class="r">Present</th><th class="r">Absent</th><th class="r">%</th></tr></thead>
+<tbody>${list.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.admission_no)}</td>
+<td>${esc(r.class_name||'')}${r.section_name?'-'+esc(r.section_name):''}</td>
+<td class="r">${r.days_marked}</td><td class="r">${r.present}</td><td class="r">${r.absent}</td>
+<td class="r ${Number(r.percent)<75?'low':''}">${r.percent}%</td></tr>`).join('')}</tbody></table>
+<div class="sig"><div>Class Teacher</div><div>Principal</div></div>
+</body></html>`);
+  win.document.close(); win.focus();
+  setTimeout(()=>win.print(),600);
+}
+
+function go(i,btn){
+  document.querySelectorAll('.view').forEach((v,k)=>v.classList.toggle('on',k===i));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+boot();
+</script>
+</body>
+</html>

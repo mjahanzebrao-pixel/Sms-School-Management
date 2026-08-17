@@ -146,6 +146,7 @@ dialog::backdrop{background:rgba(20,35,46,.6)}
       <a class="btn" href="challans.html">Challans</a>
       <a class="btn" href="payments.html">Deposit</a>
       <a class="btn here" href="reminders.html">Reminders</a>
+      <a class="btn" href="attendance.html">Attendance</a>
       <button class="btn" onclick="smsSignOut()">Sign out</button>
     </div>
   </div>
@@ -261,6 +262,24 @@ function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt
 function rs(n){return Number(n||0).toLocaleString('en-PK',{maximumFractionDigits:0})}
 function fmtd(d){if(!d)return '—';const [y,m,dd]=String(d).slice(0,10).split('-');return `${dd}-${m}-${y}`}
 
+/* Pakistani mobile -> WhatsApp format (92XXXXXXXXXX). Returns '' if invalid. */
+function toWa(raw){
+  let d=String(raw||'').replace(/\D/g,'');
+  if(d.startsWith('0092')) d=d.slice(4);
+  else if(d.startsWith('92') && d.length===12) d=d.slice(2);
+  else if(d.startsWith('0') && d.length===11) d=d.slice(1);
+  if(d.length===10 && d.startsWith('3')) return '92'+d;
+  return '';
+}
+const isMobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
+function waUrl(phone, text){
+  const n=toWa(phone);
+  if(!n) return '';
+  return isMobile
+    ? `https://wa.me/${n}?text=${encodeURIComponent(text)}`
+    : `https://web.whatsapp.com/send?phone=${n}&text=${encodeURIComponent(text)}`;
+}
+
 async function boot(){
   if(!configured){document.getElementById('schoolName').textContent='Not connected';return}
   const {data:{session}}=await sb.auth.getSession();
@@ -322,14 +341,14 @@ function visible(){
 function render(){
   const list=visible();
   const total=rows.reduce((s,r)=>s+Number(r.outstanding),0);
-  const noPhone=rows.filter(r=>!r.guardian_phone).length;
+  const noPhone=rows.filter(r=>!toWa(r.guardian_phone)).length;
   const hot=rows.filter(r=>r.days_overdue>=30).length;
 
   document.getElementById('stats').innerHTML=`
     <div class="stat bad"><div class="lbl">Outstanding</div><div class="v">${rs(total)}</div></div>
     <div class="stat"><div class="lbl">Defaulters</div><div class="v">${rows.length}</div></div>
     <div class="stat bad"><div class="lbl">Over 30 days</div><div class="v">${hot}</div></div>
-    <div class="stat ${noPhone?'bad':'ok'}"><div class="lbl">No WhatsApp number</div><div class="v">${noPhone}</div></div>`;
+    <div class="stat ${noPhone?'bad':'ok'}"><div class="lbl">Bad or missing number</div><div class="v">${noPhone}</div></div>`;
 
   document.getElementById('count').textContent=`${list.length} of ${rows.length} defaulters`;
 
@@ -340,11 +359,11 @@ function render(){
     list.map(r=>{
       const cls=r.days_overdue>=30?'hot':r.days_overdue>=15?'warm':'cool';
       return `<tr>
-      <td><input type="checkbox" class="pk" value="${r.student_id}" ${r.guardian_phone?'':'disabled'}
+      <td><input type="checkbox" class="pk" value="${r.student_id}" ${toWa(r.guardian_phone)?'':'disabled'}
            onchange="tick(this)" aria-label="Select ${esc(r.name)}"></td>
       <td><div class="nm">${esc(r.name)}</div>
         <div class="fa">s/o ${esc(r.father_name)} · ${esc(r.admission_no)}</div>
-        ${r.guardian_phone?'':'<div class="nophone">No WhatsApp number on file</div>'}</td>
+        ${toWa(r.guardian_phone)?'':`<div class="nophone">${r.guardian_phone?'Invalid number: '+esc(r.guardian_phone):'No WhatsApp number on file'}</div>`}</td>
       <td class="hide-sm num">${esc(r.class_name||'—')}${r.section_name?'-'+esc(r.section_name):''}</td>
       <td class="r" style="font-weight:600;color:var(--oxide)">${rs(r.outstanding)}</td>
       <td class="r"><span class="late ${cls}">${r.days_overdue}d</span></td>
@@ -393,8 +412,8 @@ function fill(tplBody, r){
 /* ---------------- sender ---------------- */
 function startSending(){
   const ids=[...document.querySelectorAll('.pk:checked')].map(c=>c.value);
-  queue=rows.filter(r=>ids.includes(r.student_id) && r.guardian_phone);
-  if(!queue.length) return toast('None of the selected students have a WhatsApp number');
+  queue=rows.filter(r=>ids.includes(r.student_id) && toWa(r.guardian_phone));
+  if(!queue.length) return toast('None of the selected students have a valid WhatsApp number');
   qi=0;
   dlgSend.showModal();
   showOne();
@@ -426,8 +445,8 @@ function showOne(){
 function openWa(){
   const r=queue[qi];
   const t=templates[+document.getElementById('tpl').value]||templates[0];
-  const phone=(r.guardian_phone||'').replace(/\D/g,'');
-  const url=`https://wa.me/${phone}?text=${encodeURIComponent(fill(t.body,r))}`;
+  const url=waUrl(r.guardian_phone, fill(t.body,r));
+  if(!url) return toast(`"${r.guardian_phone}" is not a valid Pakistani mobile — fix it in Students`);
   window.open(url,'_blank');
   opened=true;
   document.getElementById('openBtn').textContent='Opened — reopen';

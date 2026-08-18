@@ -86,7 +86,7 @@ if (!window.SMS_CONFIG || !SMS_CONFIG.url.startsWith('https://')) {
 
   // already signed in? go straight through
   sb.auth.getSession().then(({data:{session}})=>{
-    if(session) location.href = 'students.html';
+    if(session) location.href = 'dashboard.html';
   });
 
   window.signIn = async function(){
@@ -107,7 +107,7 @@ if (!window.SMS_CONFIG || !SMS_CONFIG.url.startsWith('https://')) {
       return show('This account is not linked to a school yet. Run 000_bootstrap.sql.', 'err');
     }
     show(`Welcome, ${profile.name}.`, 'ok');
-    location.href = 'students.html';
+    location.href = 'dashboard.html';
   };
 }
 </script>

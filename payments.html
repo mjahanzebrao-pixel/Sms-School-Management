@@ -86,6 +86,8 @@ td .fa{color:var(--ink-3);font-size:12.5px}
 
 .searchbig{display:flex;gap:10px;align-items:center;margin-bottom:18px}
 .searchbig input{font-size:17px;padding:13px 15px}
+.browse{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-6px 0 18px}
+.browse .lbl{margin:0}
 
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);
   border:1px solid var(--rule);margin-bottom:20px}
@@ -187,6 +189,15 @@ dialog::backdrop{background:rgba(20,35,46,.55)}
       <button class="btn" onclick="clearAll()">Clear</button>
     </div>
 
+    <div class="browse">
+      <span class="lbl">or browse</span>
+      <select id="bClass" onchange="fillBSections()" style="width:auto"></select>
+      <select id="bSection" onchange="browseClass()" style="width:auto"></select>
+      <label style="display:flex;align-items:center;gap:7px;font-size:13.5px">
+        <input type="checkbox" id="bDueOnly" checked onchange="browseClass()"> Only those who owe
+      </label>
+    </div>
+
     <div id="results"></div>
     <div id="detail"></div>
   </section>
@@ -241,7 +252,7 @@ dialog::backdrop{background:rgba(20,35,46,.55)}
 const configured = !!(window.SMS_CONFIG && SMS_CONFIG.url.startsWith('https://'));
 const sb = configured ? supabase.createClient(SMS_CONFIG.url, SMS_CONFIG.anonKey) : null;
 
-let school=null, classes=[], current=null, currentChallans=[], lastReceipt=null;
+let school=null, classes=[], sections=[], current=null, currentChallans=[], lastReceipt=null;
 let dayRows=[], dueRows=[];
 
 const MONTHS=['January','February','March','April','May','June','July','August',
@@ -274,6 +285,12 @@ async function boot(){
   document.getElementById('oClass').innerHTML='<option value="">All classes</option>'+
     classes.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
 
+  const {data:sec}=await sb.from('sections').select('*').order('name');
+  sections=sec||[];
+  document.getElementById('bClass').innerHTML='<option value="">Choose class…</option>'+
+    classes.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+  fillBSections();
+
   document.getElementById('colDate').value=new Date().toISOString().slice(0,10);
   await loadDay();
   await loadDue();
@@ -286,6 +303,7 @@ function findStudent(){clearTimeout(findTimer);findTimer=setTimeout(runFind,220)
 
 async function runFind(){
   const q=document.getElementById('find').value.trim();
+  if(q.length>=2) document.getElementById('bClass').value='';
   const box=document.getElementById('results');
   if(q.length<2){box.innerHTML='';return}
 
@@ -464,10 +482,72 @@ async function undoPayment(id){
 
 function clearAll(){
   current=null; currentChallans=[];
+  document.getElementById('bClass').value='';
+  fillBSections();
   document.getElementById('find').value='';
   document.getElementById('results').innerHTML='';
   document.getElementById('detail').innerHTML='';
   document.getElementById('find').focus();
+}
+
+/* ---------------- browse by class ---------------- */
+function fillBSections(){
+  const cid=document.getElementById('bClass').value;
+  const mine=sections.filter(x=>x.class_id===cid);
+  document.getElementById('bSection').innerHTML='<option value="">All sections</option>'+
+    mine.map(x=>`<option value="${x.id}">Section ${esc(x.name)}</option>`).join('');
+  browseClass();
+}
+
+async function browseClass(){
+  const cid=document.getElementById('bClass').value;
+  const sid=document.getElementById('bSection').value;
+  const dueOnly=document.getElementById('bDueOnly').checked;
+  const box=document.getElementById('results');
+
+  if(!cid){ box.innerHTML=''; return; }
+
+  document.getElementById('find').value='';
+  document.getElementById('detail').innerHTML='';
+
+  let q=sb.from('v_student_balances').select('*').eq('class_id',cid);
+  if(sid) q=q.eq('section_id',sid);
+  const {data}=await q.order('name');
+
+  let list=data||[];
+  if(dueOnly) list=list.filter(r=>Number(r.outstanding)>0);
+
+  const owed=list.reduce((s,r)=>s+Number(r.outstanding),0);
+  const cname=(classes.find(c=>c.id===cid)||{}).name||'';
+
+  if(!list.length){
+    box.innerHTML=`<div class="panel"><div class="empty"><b>Nobody here</b>
+      ${dueOnly?'Everyone in this class is clear. Untick the filter to see all students.'
+               :'No active students in this class.'}</div></div>`;
+    return;
+  }
+
+  box.innerHTML=`<div class="panel">
+    <div class="panelhead">
+      <div class="lbl">${esc(cname)}${sid?' — Section '+esc((sections.find(x=>x.id===sid)||{}).name||''):''}
+        &middot; ${list.length} student${list.length===1?'':'s'}</div>
+      <div class="lbl">Total due Rs ${rs(owed)}</div>
+    </div>
+    <table><thead><tr>
+      <th>Student</th><th class="hide-sm">Adm No</th>
+      <th class="r">Outstanding</th><th class="r hide-sm">Overdue</th><th></th>
+    </tr></thead><tbody>`+list.map(r=>{
+      const days=r.oldest_due_date?Math.floor((Date.now()-new Date(r.oldest_due_date))/864e5):0;
+      const due=Number(r.outstanding)>0;
+      return `<tr>
+      <td><div class="nm">${esc(r.name)}</div><div class="fa">s/o ${esc(r.father_name)}</div></td>
+      <td class="hide-sm num" style="color:var(--ink-3)">${esc(r.admission_no)}</td>
+      <td class="r" style="font-weight:600;color:${due?'var(--oxide)':'var(--seal)'}">${due?rs(r.outstanding):'clear'}</td>
+      <td class="r hide-sm" style="color:${days>30?'var(--oxide)':'var(--ink-3)'};font-size:12.5px">${days>0?days+'d':'—'}</td>
+      <td style="text-align:right">
+        <button class="btn sm ${due?'primary':''}" onclick="openStudent('${r.student_id}')">
+          ${due?'Receive':'Open'}</button></td>
+    </tr>`}).join('')+'</tbody></table></div>';
 }
 
 /* ---------------- day book ---------------- */

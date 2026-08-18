@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — School Management System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="lang.js" defer></script>
+<style>
+:root{
+  --ink:#14232E; --ink-2:#3D5261; --ink-3:#7C8F9B;
+  --paper:#FBFAF6; --ledger:#E7EDE5; --ledger-line:#CBD8C8; --rule:#D3D8D2;
+  --oxide:#A8332A; --oxide-soft:#F3E2E0;
+  --seal:#2E6B4F; --seal-soft:#E1EDE5;
+  --amber:#9A6B12; --amber-soft:#F6EBD5;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased}
+.num{font-family:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
+.lbl{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
+  letter-spacing:.14em;font-weight:600;font-size:12px;color:var(--ink-3)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 18px 90px}
+
+.topbar{border-bottom:2px solid var(--ink);padding:16px 0 12px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.crest{width:38px;height:38px;flex:none;border:1.5px solid var(--ink);display:grid;
+  place-items:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px}
+.brand h1{font-family:'Barlow Condensed',sans-serif;font-size:23px;font-weight:600;
+  letter-spacing:.03em;margin:0;text-transform:uppercase}
+.brand .sub{font-size:12px;color:var(--ink-3);margin-top:-2px}
+a.btn{text-decoration:none;display:inline-block}
+.nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.nav a.btn.here{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.12em;
+  font-size:12.5px;font-weight:600;border:1px solid var(--rule);background:#fff;
+  color:var(--ink-2);padding:9px 14px;cursor:pointer}
+.btn:hover{border-color:var(--ink);color:var(--ink)}
+select{font-family:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--rule);background:#fff}
+
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
+  flex-wrap:wrap;margin:26px 0 18px}
+.head h2{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:600;
+  letter-spacing:.02em;margin:0;text-transform:uppercase}
+
+/* headline collection block */
+.hero{border:1px solid var(--ink);background:#fff;margin-bottom:22px}
+.hero-top{display:flex;justify-content:space-between;align-items:flex-start;
+  gap:20px;padding:20px 22px;flex-wrap:wrap}
+.hero .big{font-family:'IBM Plex Mono',monospace;font-size:42px;font-weight:600;
+  line-height:1;letter-spacing:-.02em}
+.hero .big small{font-size:18px;color:var(--ink-3);font-weight:400;margin-right:4px}
+.hero .of{font-size:13px;color:var(--ink-3);margin-top:6px}
+.hero .pct{text-align:right}
+.hero .pct .v{font-family:'IBM Plex Mono',monospace;font-size:34px;font-weight:600;line-height:1}
+.hero .pct .v.good{color:var(--seal)}
+.hero .pct .v.mid{color:var(--amber)}
+.hero .pct .v.bad{color:var(--oxide)}
+.meter{height:28px;background:var(--ledger);border-top:1px solid var(--rule);position:relative}
+.meter i{display:block;height:100%;background:var(--seal)}
+.meter span{position:absolute;top:0;bottom:0;display:flex;align-items:center;
+  font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;padding:0 10px}
+.meter .in{color:#fff}
+.meter .out{right:0;color:var(--oxide)}
+
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--rule);
+  border:1px solid var(--rule);margin-bottom:22px}
+.tile{background:#fff;padding:16px;text-decoration:none;color:inherit;display:block}
+.tile:hover{background:var(--ledger)}
+.tile .v{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;margin-top:5px;
+  line-height:1.1}
+.tile .d{font-size:12.5px;color:var(--ink-3);margin-top:5px}
+.tile.bad .v{color:var(--oxide)}
+.tile.ok .v{color:var(--seal)}
+
+.split{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.panel{border:1px solid var(--rule);background:#fff}
+.panelhead{padding:11px 14px;border-bottom:1px solid var(--rule);
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:10px 14px;border-bottom:1px dashed var(--rule)}
+.row:last-child{border-bottom:0}
+.row .who{font-size:14px;min-width:0}
+.row .who b{font-weight:600;display:block}
+.row .who small{color:var(--ink-3);font-size:12.5px}
+.row .amt{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;flex:none}
+
+.bar{height:16px;background:var(--ledger);border:1px solid var(--ledger-line);
+  position:relative;width:120px;flex:none}
+.bar i{display:block;height:100%;background:var(--seal)}
+.bar.low i{background:var(--oxide)}
+.bar span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600}
+
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px}
+.act{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.12em;
+  font-size:13px;font-weight:600;background:var(--ink);color:var(--paper);
+  border:1px solid var(--ink);padding:11px 16px;text-decoration:none;display:inline-block}
+.act:hover{background:#0B1A24}
+.act.ghost{background:#fff;color:var(--ink-2);border-color:var(--rule)}
+.act.ghost:hover{border-color:var(--ink);color:var(--ink)}
+
+.empty{padding:34px 20px;text-align:center;color:var(--ink-3);font-size:14px}
+.alert{border:1px solid var(--oxide);background:var(--oxide-soft);color:#7A241D;
+  padding:11px 14px;font-size:13.5px;margin-bottom:22px}
+.alert b{font-weight:600}
+
+@media(max-width:820px){
+  .tiles{grid-template-columns:1fr 1fr}
+  .split{grid-template-columns:1fr}
+  .hero .big{font-size:34px}
+}
+:focus-visible{outline:2px solid var(--oxide);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="crest" id="crest">··</div>
+      <div>
+        <h1 id="schoolName">Loading…</h1>
+        <div class="sub" id="schoolSub">Connecting</div>
+      </div>
+    </div>
+    <div class="nav">
+      <a class="btn here" href="dashboard.html">Dashboard</a>
+      <a class="btn" href="students.html">Students</a>
+      <a class="btn" href="fees.html">Fees</a>
+      <a class="btn" href="challans.html">Challans</a>
+      <a class="btn" href="payments.html">Deposit</a>
+      <a class="btn" href="reminders.html">Reminders</a>
+      <a class="btn" href="attendance.html">Attendance</a>
+      <button class="btn" onclick="smsSignOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="head">
+    <h2 id="monthTitle">—</h2>
+    <select id="mSel" onchange="load()" style="width:auto"></select>
+  </div>
+
+  <div id="alerts"></div>
+
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="lbl">Collected this month</div>
+        <div class="big"><small>Rs</small><span id="hCollected">—</span></div>
+        <div class="of" id="hOf">—</div>
+      </div>
+      <div class="pct">
+        <div class="lbl">Collection rate</div>
+        <div class="v" id="hPct">—</div>
+      </div>
+    </div>
+    <div class="meter">
+      <i id="hBar" style="width:0%"></i>
+      <span class="in" id="hIn"></span>
+      <span class="out" id="hOut"></span>
+    </div>
+  </div>
+
+  <div class="tiles">
+    <a class="tile bad" href="reminders.html">
+      <div class="lbl">Total outstanding</div>
+      <div class="v" id="tOut">—</div>
+      <div class="d" id="tOutD">across all months</div>
+    </a>
+    <a class="tile bad" href="reminders.html">
+      <div class="lbl">Defaulters</div>
+      <div class="v" id="tDef">—</div>
+      <div class="d" id="tDefD">—</div>
+    </a>
+    <a class="tile ok" href="payments.html">
+      <div class="lbl">Received today</div>
+      <div class="v" id="tToday">—</div>
+      <div class="d" id="tTodayD">—</div>
+    </a>
+    <a class="tile" href="attendance.html">
+      <div class="lbl">Attendance today</div>
+      <div class="v" id="tAtt">—</div>
+      <div class="d" id="tAttD">—</div>
+    </a>
+  </div>
+
+  <div class="actions">
+    <a class="act" href="challans.html">Generate challans</a>
+    <a class="act ghost" href="payments.html">Receive fee</a>
+    <a class="act ghost" href="reminders.html">Send reminders</a>
+    <a class="act ghost" href="attendance.html">Mark attendance</a>
+  </div>
+
+  <div class="split">
+    <div class="panel">
+      <div class="panelhead">
+        <div class="lbl">Worst arrears by class</div>
+        <div class="lbl">Pending</div>
+      </div>
+      <div id="byClass"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panelhead">
+        <div class="lbl">Latest receipts</div>
+        <div class="lbl" id="recCount">—</div>
+      </div>
+      <div id="recent"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const configured = !!(window.SMS_CONFIG && SMS_CONFIG.url.startsWith('https://'));
+const sb = configured ? supabase.createClient(SMS_CONFIG.url, SMS_CONFIG.anonKey) : null;
+
+let school=null;
+const MONTHS=['January','February','March','April','May','June','July','August',
+  'September','October','November','December'];
+
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function rs(n){return Number(n||0).toLocaleString('en-PK',{maximumFractionDigits:0})}
+
+async function boot(){
+  if(!configured){document.getElementById('schoolName').textContent='Not connected';return}
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){location.href='login.html';return}
+
+  const {data:s}=await sb.from('schools').select('*').limit(1).maybeSingle();
+  school=s;
+  if(school){
+    document.getElementById('schoolName').textContent=school.name;
+    document.getElementById('schoolSub').textContent=
+      `${school.address||''} · Session ${school.academic_year}`;
+    document.getElementById('crest').textContent=
+      school.name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+  }
+
+  const now=new Date();
+  const opts=[];
+  for(let i=0;i<6;i++){
+    const d=new Date(now.getFullYear(), now.getMonth()-i, 1);
+    opts.push(`<option value="${d.getMonth()+1}|${d.getFullYear()}">${MONTHS[d.getMonth()]} ${d.getFullYear()}</option>`);
+  }
+  document.getElementById('mSel').innerHTML=opts.join('');
+  await load();
+}
+
+async function load(){
+  const [m,y]=document.getElementById('mSel').value.split('|').map(Number);
+  document.getElementById('monthTitle').textContent=`${MONTHS[m-1]} ${y}`;
+
+  const {data:sum,error}=await sb.rpc('collection_summary',{p_month:m,p_year:y});
+  if(error) return;
+
+  const billed=Number(sum.billed||0), collected=Number(sum.collected||0);
+  const pct=billed?Math.round(collected/billed*100):0;
+
+  document.getElementById('hCollected').textContent=rs(collected);
+  document.getElementById('hOf').textContent=
+    billed ? `of Rs ${rs(billed)} billed · ${sum.challans} challans`
+           : 'nothing billed for this month yet';
+  const pctEl=document.getElementById('hPct');
+  pctEl.textContent=billed?pct+'%':'—';
+  pctEl.className='v '+(pct>=85?'good':pct>=60?'mid':'bad');
+  document.getElementById('hBar').style.width=pct+'%';
+  document.getElementById('hIn').textContent=collected?'Rs '+rs(collected):'';
+  document.getElementById('hOut').textContent=
+    billed-collected>0 ? 'Rs '+rs(billed-collected)+' pending' : '';
+
+  document.getElementById('tOut').textContent=rs(sum.outstanding);
+  document.getElementById('tDef').textContent=sum.defaulters;
+  document.getElementById('tDefD').textContent=
+    sum.students ? `of ${sum.students} students · ${Math.round(sum.defaulters/sum.students*100)}%` : '—';
+  document.getElementById('tOutD').textContent=
+    sum.reminded_7d ? `${sum.reminded_7d} reminded this week` : 'no reminders sent this week';
+
+  await todayCash();
+  await todayAttendance();
+  await arrearsByClass();
+  await recentReceipts();
+  await alerts(sum);
+}
+
+async function todayCash(){
+  const d=new Date().toISOString().slice(0,10);
+  const {data}=await sb.from('v_payment_log').select('amount,is_reversed')
+    .gte('received_at',d+'T00:00:00').lte('received_at',d+'T23:59:59.999');
+  const live=(data||[]).filter(r=>!r.is_reversed);
+  const total=live.reduce((s,r)=>s+Number(r.amount),0);
+  document.getElementById('tToday').textContent=rs(total);
+  document.getElementById('tTodayD').textContent=
+    `${live.length} receipt${live.length===1?'':'s'}`;
+}
+
+async function todayAttendance(){
+  const {data}=await sb.from('v_attendance_status').select('*');
+  const list=data||[];
+  const marked=list.filter(r=>r.att_date);
+  const present=marked.reduce((s,r)=>s+Number(r.present||0),0);
+  const total=marked.reduce((s,r)=>
+    s+Number(r.present||0)+Number(r.absent||0)+Number(r.leave_count||0)+Number(r.late||0),0);
+
+  document.getElementById('tAtt').textContent=
+    marked.length ? (total?Math.round(present/total*100)+'%':'—') : '—';
+  document.getElementById('tAttD').textContent=
+    marked.length ? `${marked.length} of ${list.length} sections marked`
+                  : 'no register marked today';
+}
+
+async function arrearsByClass(){
+  const {data}=await sb.from('v_student_balances').select('*');
+  const rows=(data||[]).filter(r=>Number(r.outstanding)>0);
+  const byClass={};
+  rows.forEach(r=>{
+    const k=r.class_name||'Unassigned';
+    byClass[k]=byClass[k]||{name:k,total:0,count:0};
+    byClass[k].total+=Number(r.outstanding);
+    byClass[k].count++;
+  });
+  const list=Object.values(byClass).sort((a,b)=>b.total-a.total).slice(0,6);
+
+  document.getElementById('byClass').innerHTML = list.length
+    ? list.map(c=>`<div class="row">
+        <div class="who"><b>${esc(c.name)}</b>
+          <small>${c.count} student${c.count===1?'':'s'} owing</small></div>
+        <div class="amt" style="color:var(--oxide)">Rs ${rs(c.total)}</div>
+      </div>`).join('')
+    : `<div class="empty">Nothing outstanding anywhere.</div>`;
+}
+
+async function recentReceipts(){
+  const {data}=await sb.from('v_payment_log').select('*')
+    .eq('is_reversed',false).order('received_at',{ascending:false}).limit(6);
+  const list=data||[];
+  document.getElementById('recCount').textContent=`last ${list.length}`;
+  document.getElementById('recent').innerHTML = list.length
+    ? list.map(p=>`<div class="row">
+        <div class="who"><b>${esc(p.student_name)}</b>
+          <small>${esc(p.class_name||'—')} · ${new Date(p.received_at).toLocaleDateString('en-PK',{day:'2-digit',month:'short'})}</small></div>
+        <div class="amt" style="color:var(--seal)">Rs ${rs(p.amount)}</div>
+      </div>`).join('')
+    : `<div class="empty">No payments recorded yet.</div>`;
+}
+
+async function alerts(sum){
+  const out=[];
+  const [m,y]=document.getElementById('mSel').value.split('|').map(Number);
+
+  if(Number(sum.challans)===0){
+    out.push(`<b>No challans issued for ${MONTHS[m-1]} ${y}.</b>
+      Nothing has been billed, so the collection figures above are empty.
+      Generate a run to start the month.`);
+  }
+  const {data:noPhone}=await sb.from('students').select('id')
+    .eq('status','active').is('guardian_phone',null);
+  if((noPhone||[]).length){
+    out.push(`<b>${noPhone.length} student${noPhone.length===1?'':'s'} have no guardian phone number.</b>
+      They cannot be sent WhatsApp reminders until this is filled in.`);
+  }
+  document.getElementById('alerts').innerHTML =
+    out.map(t=>`<div class="alert">${t}</div>`).join('');
+}
+
+boot();
+</script>
+</body>
+</html>

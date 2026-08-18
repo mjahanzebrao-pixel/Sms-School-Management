@@ -24,7 +24,7 @@
 
 const UR = {
   /* ---- navigation ---- */
-  'Students':'طلبہ', 'Fees':'فیس', 'Challans':'چالان', 'Deposit':'جمع',
+  'Dashboard':'ڈیش بورڈ', 'Students':'طلبہ', 'Fees':'فیس', 'Challans':'چالان', 'Deposit':'جمع',
   'Reminders':'یاد دہانی', 'Attendance':'حاضری', 'Sign out':'لاگ آؤٹ',
   'Refresh':'تازہ کریں',
 
@@ -97,6 +97,12 @@ const UR = {
 
   /* ---- stat labels ---- */
   'Billed':'بل شدہ', 'Collected':'وصول شدہ', 'Cash':'نقد',
+  'Collected this month':'اس ماہ وصولی', 'Collection rate':'وصولی کی شرح',
+  'Total outstanding':'کل واجب الادا', 'Received today':'آج وصول',
+  'Attendance today':'آج کی حاضری', 'Latest receipts':'حالیہ رسیدیں',
+  'Worst arrears by class':'جماعت کے حساب سے بقایا',
+  'Generate challans':'چالان بنائیں', 'Receive fee':'فیس وصول کریں',
+  'Send reminders':'یاد دہانی بھیجیں', 'Mark attendance':'حاضری لگائیں',
   'Other methods':'دیگر طریقے', 'Receipts':'رسیدیں',
   'Students':'طلبہ', 'Rows read':'قطاریں پڑھیں', 'Will be added':'شامل ہوں گے',
   'Will be updated':'اپ ڈیٹ ہوں گے', 'Will be skipped':'چھوڑے جائیں گے',
